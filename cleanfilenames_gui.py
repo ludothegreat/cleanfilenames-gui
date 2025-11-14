@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QComboBox,
     QTextBrowser,
+    QMenu,
 )
 
 try:  # pragma: no cover
@@ -142,6 +143,8 @@ class MainWindow(QMainWindow):
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_table_menu)
         QShortcut(QKeySequence.Copy, self.table, activated=self.copy_selected_rows)
         main_layout.addWidget(self.table, stretch=1)
 
@@ -305,6 +308,42 @@ class MainWindow(QMainWindow):
                 )
         if lines:
             QApplication.clipboard().setText("\n".join(lines))
+
+    def show_table_menu(self, pos: QPoint) -> None:
+        menu = QMenu(self)
+        copy_action = menu.addAction("Copy Selected (Tab-separated)")
+        export_action = menu.addAction("Export to CSV…")
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if action == copy_action:
+            self.copy_selected_rows()
+        elif action == export_action:
+            self.export_csv()
+
+    def export_csv(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Results",
+            str(Path.home() / "cleanfilenames.csv"),
+            "CSV Files (*.csv);;All Files (*)",
+        )
+        if not path:
+            return
+        rows = sorted({index.row() for index in self.table.selectionModel().selectedRows()})
+        if not rows:
+            rows = list(range(len(self.candidates)))
+        lines = ["type,old,new,status,message"]
+        for row in rows:
+            if 0 <= row < len(self.candidates):
+                cand = self.candidates[row]
+                fields = [
+                    cand.item_type,
+                    str(cand.path),
+                    str(cand.new_path),
+                    cand.status,
+                    cand.message.replace('"', '""'),
+                ]
+                lines.append(",".join(f'"{field}"' for field in fields))
+        Path(path).write_text("\n".join(lines))
 
 
 class SettingsDialog(QDialog):
