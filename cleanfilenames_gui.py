@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QPlainTextEdit,
     QComboBox,
+    QTextBrowser,
 )
 
 try:  # pragma: no cover
@@ -43,25 +44,32 @@ PRESETS = {
     "Minimal (USA/EU/JP)": ["USA", "Europe", "JP", "PAL", "World"],
 }
 
-HELP_TEXT = (
-    "Each token represents an entire region string that appears inside the parentheses.\n"
-    "For example, if your files are named:\n"
-    "  • Game 1 (USA,EU,JP).zip\n"
-    "  • Game 2 (En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar).zip\n"
-    "then you need two tokens:\n"
-    "  USA,EU,JP\n"
-    "  En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar\n\n"
-    "When the tool rebuilds the regex, those tokens become part of the expression:\n"
-    "  \\s*\\((?:USA,EU,JP|En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar|...)\\)\\s*\n"
-    "Any parentheses containing one of those tokens (with optional spaces) will be removed.\n\n"
-    "Ways to customize:\n"
-    "  • Choose a preset to load a known token list.\n"
-    "  • Edit tokens (one per line). The regex updates automatically.\n"
-    "  • Paste a custom regex (advanced users). The mode switches to 'Custom'.\n"
-    "  • Load/Save buttons let you import/export plain-text regex files.\n\n"
-    "Tokens may include regex syntax if you intentionally want pattern matching (e.g., v\\d+\\.\\d+), "
-    "but remember that the entire token is inserted into the regex as-is."
-)
+HELP_TEXT = """
+<h3>Tokens &amp; Regex</h3>
+<p>Each token represents an entire region string that appears inside parentheses.
+For example, if your files are named:</p>
+<ul>
+  <li>Game 1 (USA,EU,JP).zip</li>
+  <li>Game 2 (En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar).zip</li>
+</ul>
+<p>Then you need two tokens:</p>
+<pre>USA,EU,JP
+En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar</pre>
+<p>When the tool rebuilds the regex, those tokens become part of the expression:</p>
+<pre>\\s*\\((?:USA,EU,JP|En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar|...)\\)\\s*</pre>
+<p>Any parentheses containing one of those tokens (with optional spaces) will be removed.</p>
+<h4>Customize By</h4>
+<ul>
+  <li>Choosing a preset to load a known token list.</li>
+  <li>Editing tokens (one per line). The regex updates automatically.</li>
+  <li>Pasting a custom regex (advanced users) to switch to “Custom” mode.</li>
+  <li>Loading or saving regex text files for reuse.</li>
+</ul>
+<p>Tokens may include regex syntax if you intentionally want pattern matching (e.g., <code>v\\d+\\.\\d+</code>),
+but remember that the entire token is inserted into the regex as-is.</p>
+<p>A helpful regex cheat sheet can be found here:
+<a href="https://www.rexegg.com/regex-quickstart.php">https://www.rexegg.com/regex-quickstart.php</a></p>
+"""
 
 if __package__:
     from .cleanfilenames_core import apply_candidates, collect_candidates, summarize
@@ -387,9 +395,9 @@ class SettingsDialog(QDialog):
         dialog.setWindowTitle("Regex & Tokens Help")
         dialog.resize(640, 420)
         layout = QVBoxLayout(dialog)
-        text = QPlainTextEdit()
-        text.setPlainText(HELP_TEXT)
-        text.setReadOnly(True)
+        text = QTextBrowser()
+        text.setHtml(HELP_TEXT)
+        text.setOpenExternalLinks(True)
         layout.addWidget(text)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(dialog.reject)
