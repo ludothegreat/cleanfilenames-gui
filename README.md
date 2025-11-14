@@ -93,6 +93,7 @@ Features:
   - Token editor (one region token per line, rebuilt into the regex; supports commas and regex syntax if you need ranges).
   - Load/save buttons for importing/exporting regex patterns.
   - Toggles for directory/root renames and stop-on-error behavior.
+- Built-in help dialog explaining tokens, patterns, and customization paths.
 
 ## Building a Windows `.exe`
 

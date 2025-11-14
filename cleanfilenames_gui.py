@@ -43,6 +43,24 @@ PRESETS = {
     "Minimal (USA/EU/JP)": ["USA", "Europe", "JP", "PAL", "World"],
 }
 
+HELP_TEXT = (
+    "Tokens represent the literal text that appears inside parentheses in your "
+    "filenames (for example: USA, Europe, En,Fr,De,Es,It). Each token can contain "
+    "commas or other characters; the tool treats the token as-is when rebuilding "
+    "the regex.\n\n"
+    "The regex is generated using the template:\n"
+    "    \\s*\\((?:token1|token2|token3)\\)\\s*\n"
+    "Any parentheses containing one of those tokens (with optional spaces) will be "
+    "removed from filenames.\n\n"
+    "Customize it by:\n"
+    "  • Choosing a preset to load a known token list.\n"
+    "  • Editing tokens (one per line). The regex updates automatically.\n"
+    "  • Pasting a custom regex (advanced users). The mode switches to 'Custom'.\n"
+    "  • Loading or saving regex text files for reuse.\n\n"
+    "Tokens may include regex syntax if you need pattern matching (e.g., v\\d+\\.\\d+), "
+    "but keep in mind that the entire token is inserted directly into the regex."
+)
+
 if __package__:
     from .cleanfilenames_core import apply_candidates, collect_candidates, summarize
 else:  # Allow running as a stand-alone script
@@ -240,6 +258,10 @@ class SettingsDialog(QDialog):
         tokens_btn.clicked.connect(self.edit_tokens)
         preset_layout.addWidget(tokens_btn)
 
+        help_btn = QPushButton("Help…")
+        help_btn.clicked.connect(self.show_help)
+        preset_layout.addWidget(help_btn)
+
         load_btn = QPushButton("Load Pattern…")
         load_btn.clicked.connect(self.load_pattern)
         preset_layout.addWidget(load_btn)
@@ -250,12 +272,6 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(preset_layout)
 
-        layout.addWidget(
-            QLabel(
-                "Tokens describe the text that appears inside parentheses (e.g., USA, Europe).\n"
-                "The regex is rebuilt from the token list, but you can paste a custom pattern if needed."
-            )
-        )
         layout.addWidget(QLabel("Region regex:"))
         self.regex_edit = QPlainTextEdit()
         self.regex_edit.setPlainText(config.regex)
@@ -363,6 +379,21 @@ class SettingsDialog(QDialog):
             Path(path).write_text(self.current_regex() or DEFAULT_PATTERN)
         except OSError as exc:
             QMessageBox.warning(self, "Save failed", str(exc))
+
+    def show_help(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Regex & Tokens Help")
+        dialog.resize(640, 420)
+        layout = QVBoxLayout(dialog)
+        text = QPlainTextEdit()
+        text.setPlainText(HELP_TEXT)
+        text.setReadOnly(True)
+        layout.addWidget(text)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dialog.reject)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.exec()
 
 
 class TokensDialog(QDialog):
