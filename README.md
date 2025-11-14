@@ -109,3 +109,11 @@ Features:
 - The regex is identical to the PowerShell version for parity.
 - Directories are renamed deepest-first to avoid “path not found” issues.
 - Collisions are reported but not auto-resolved (per current PowerShell behavior).
+
+## Current Status (2025‑11‑13)
+
+- Platform parity work is complete: the PowerShell snapshot logic now lives in `cleanfilenames_core.py` with both CLI and PySide6 GUI entrypoints, tokenized regex presets, JSON config auto-loading, context menu + CSV export, regex help dialog, and 5K-row UI truncation for large jobs.
+- Normalization now drops literal `\` characters and rebuilds the region regex from the saved token list, so dry runs and real runs stay in sync even after editing presets.
+- Latest fix (this session) adjusts file renames to reference the post-directory-rename parent path, eliminating the `[Errno 2] No such file or directory` bursts that showed up when applying against `/tmp/clean_test_suite`.
+- Smoke test: `python3 cleanfilenames_core.py /tmp/clean_test_suite_sample --apply` succeeded with 6/6 renames; the real 50-folder dataset still needs to be regenerated (previous run already normalized everything under `/tmp/clean_test_suite`, so there is nothing left to rename right now).
+- Outstanding follow-ups for tomorrow: (1) recreate `/tmp/clean_test_suite` (and the larger 4k-folder stress data, if needed), (2) re-run a GUI dry-run + apply to confirm the fix at scale, (3) delete temporary exports (`cleanfilenames.csv`, `cleanfilenames.txt`) if they are no longer needed once verification is done.

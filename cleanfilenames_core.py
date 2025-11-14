@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional, Set
@@ -18,6 +19,33 @@ except ImportError:  # pragma: no cover
 REGION_PATTERN = re.compile(DEFAULT_PATTERN)
 
 
+def _is_case_insensitive_filesystem() -> bool:
+    """Detect if the filesystem is case-insensitive (Windows, macOS)."""
+    # Create a temp file and check if we can find it with different case
+    with tempfile.NamedTemporaryFile(prefix='CasE_TeSt_', delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        # Try to find it with different case
+        tmp_lower = Path(str(tmp_path).lower())
+        # If the lowercase version exists and has a different string representation,
+        # the filesystem is case-insensitive
+        result = tmp_lower.exists() and str(tmp_lower) != str(tmp_path)
+        return result
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+# Cache the result since filesystem type doesn't change during execution
+_CASE_INSENSITIVE = _is_case_insensitive_filesystem()
+
+
+def _normalize_path_for_comparison(path: Path) -> str:
+    """Normalize path for collision detection on case-insensitive systems."""
+    if _CASE_INSENSITIVE:
+        return str(path.resolve()).lower()
+    return str(path.resolve())
+
+
 @dataclass
 class RenameCandidate:
     """Represents a file or directory rename that will be performed."""
@@ -29,6 +57,7 @@ class RenameCandidate:
     status: str = "pending"  # pending, done, error, skipped
     message: str = ""
     relative_path: str = ""
+    original_relative_path: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -81,14 +110,17 @@ def collect_candidates(
         for fname in filenames:
             new_name = normalize_name(fname, pattern)
             if new_name != fname:
+                path = dir_path / fname
                 new_path = dir_path / new_name
+                relative = str(path.relative_to(root_path))
                 candidates.append(
                     RenameCandidate(
-                        path=dir_path / fname,
+                        path=path,
                         new_name=new_name,
                         new_path=new_path,
                         item_type="file",
-                        relative_path=str((dir_path / fname).relative_to(root_path)),
+                        original_relative_path=relative,
+                        relative_path=relative,
                     )
                 )
 
@@ -100,13 +132,15 @@ def collect_candidates(
                 continue
             if new_name != directory.name:
                 new_path = directory.with_name(new_name)
+                relative = str(directory.relative_to(root_path))
                 candidates.append(
                     RenameCandidate(
                         path=directory,
                         new_name=new_name,
                         new_path=new_path,
                         item_type="directory",
-                        relative_path=str(directory.relative_to(root_path)),
+                        original_relative_path=relative,
+                        relative_path=relative,
                     )
                 )
     else:
@@ -121,6 +155,7 @@ def collect_candidates(
                         new_name=root_name,
                         new_path=parent / root_name,
                         item_type="directory",
+                        original_relative_path=".",
                         relative_path=".",
                     )
                 )
@@ -158,31 +193,57 @@ def apply_candidates(
     stop_on_error: bool = False,
 ) -> None:
     """Attempt to rename every candidate in-place."""
-    # Process files first, then directories
+    dirs = sorted(
+        [c for c in candidates if c.item_type == "directory"],
+        key=lambda cand: len(cand.path.parts),
+        reverse=True,
+    )
     files = [c for c in candidates if c.item_type == "file"]
-    dirs = [c for c in candidates if c.item_type == "directory"]
 
-    occupied: Set[Path] = set()
+    # Track occupied paths using normalized (case-insensitive on Windows/macOS) keys
+    occupied: Set[str] = set()
 
-    for cand in files + dirs:
+    for cand in dirs + files:
         if cand.status != "pending":
             continue
-        if cand.new_path.exists() and cand.new_path != cand.path:
+        if cand.item_type == "file":
+            # Directories are renamed first, so the file now lives beneath the
+            # normalized parent path but still has its original filename.
+            source_path = cand.new_path.parent / cand.path.name
+            target_path = cand.new_path
+        else:
+            source_path = cand.path
+            target_path = cand.path.parent / cand.new_name
+
+        # Normalize paths for case-insensitive comparison
+        source_norm = _normalize_path_for_comparison(source_path)
+        target_norm = _normalize_path_for_comparison(target_path)
+        new_path_norm = _normalize_path_for_comparison(cand.new_path)
+
+        # Check if target already exists (case-insensitive on Windows/macOS)
+        if target_path.exists() and target_norm != source_norm:
             cand.status = "error"
-            cand.message = "Target already exists"
+            cand.message = "Target already exists (case-insensitive collision)"
             continue
-        if cand.new_path in occupied and cand.new_path != cand.path:
+        if cand.new_path.exists() and new_path_norm != source_norm:
+            cand.status = "error"
+            cand.message = "Target already exists (case-insensitive collision)"
+            continue
+
+        # Check if another pending rename will create this same target
+        if new_path_norm in occupied and new_path_norm != source_norm:
             cand.status = "error"
             cand.message = "Another item already targets this name"
             continue
+
         try:
             if dry_run:
                 cand.status = "done (dry run)"
-                occupied.add(cand.new_path)
+                occupied.add(new_path_norm)
             else:
-                cand.path.rename(cand.new_path)
+                source_path.rename(target_path)
                 cand.status = "done"
-                occupied.add(cand.new_path)
+                occupied.add(new_path_norm)
         except OSError as exc:
             cand.status = "error"
             cand.message = str(exc)
