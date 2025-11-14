@@ -95,6 +95,7 @@ Features:
   - Toggles for directory/root renames and stop-on-error behavior.
 - Built-in help dialog explaining tokens, patterns, and customization paths.
 - Table results support `Ctrl+C`/`Cmd+C` to copy selected rows as tab-separated text.
+- Right-click the results to export CSV; the table includes a "Directory" column so you can see the path relative to the scan root (e.g., `Extras/Music/Track 01`). This mirrors the on-disk rename order.
 
 ## Building a Windows `.exe`
 
