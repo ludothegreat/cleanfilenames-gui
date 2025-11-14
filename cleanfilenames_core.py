@@ -152,7 +152,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="Actually perform the renames (default: preview only).",
+        help="Actually perform the renames.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Explicitly skip renames even if --apply is provided.",
     )
     args = parser.parse_args()
 
@@ -165,7 +170,7 @@ if __name__ == "__main__":
     for cand in all_candidates:
         print(f"[{cand.item_type}] {cand.path} -> {cand.new_path}")
 
-    if args.apply:
+    if args.apply and not args.dry_run:
         apply_candidates(all_candidates)
         summary = summarize(all_candidates)
         print(
@@ -177,4 +182,4 @@ if __name__ == "__main__":
                 if cand.status == "error":
                     print(f" - Failed: {cand.path} -> {cand.new_path}: {cand.message}")
     else:
-        print("\nPreview mode only. Use --apply to execute the changes.")
+        print("\nPreview mode only. Use --apply (without --dry-run) to execute.")

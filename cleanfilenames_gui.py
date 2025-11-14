@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QCheckBox,
     QVBoxLayout,
     QWidget,
 )
@@ -52,7 +53,10 @@ class MainWindow(QMainWindow):
         path_layout.addWidget(browse_btn)
         main_layout.addLayout(path_layout)
 
-        # Action buttons
+        # Dry run + action buttons
+        controls_layout = QHBoxLayout()
+        self.dry_run_checkbox = QCheckBox("Dry run (no changes)")
+        self.dry_run_checkbox.setChecked(True)
         btn_layout = QHBoxLayout()
         self.scan_btn = QPushButton("Scan")
         self.scan_btn.clicked.connect(self.on_scan)
@@ -62,7 +66,9 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(self.scan_btn)
         btn_layout.addWidget(self.run_btn)
         btn_layout.addStretch(1)
-        main_layout.addLayout(btn_layout)
+        controls_layout.addWidget(self.dry_run_checkbox)
+        controls_layout.addLayout(btn_layout)
+        main_layout.addLayout(controls_layout)
 
         # Summary label
         self.summary_label = QLabel("No folder selected.")
@@ -133,6 +139,14 @@ class MainWindow(QMainWindow):
             QMessageBox.Yes | QMessageBox.No,
         )
         if confirm != QMessageBox.Yes:
+            return
+
+        if self.dry_run_checkbox.isChecked():
+            QMessageBox.information(
+                self,
+                "Dry run",
+                "Dry run is enabled. No changes were made.",
+            )
             return
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
