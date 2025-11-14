@@ -11,9 +11,9 @@ from typing import Iterable, List, Optional, Set
 
 # Support both package and script imports
 try:  # pragma: no cover
-    from .config_manager import AppConfig, DEFAULT_PATTERN  # type: ignore
+    from .config_manager import AppConfig, DEFAULT_PATTERN, build_regex  # type: ignore
 except ImportError:  # pragma: no cover
-    from config_manager import AppConfig, DEFAULT_PATTERN
+    from config_manager import AppConfig, DEFAULT_PATTERN, build_regex
 
 REGION_PATTERN = re.compile(DEFAULT_PATTERN)
 
@@ -68,7 +68,10 @@ def collect_candidates(
         raise FileNotFoundError(f"Path not found: {root}")
 
     config = config or AppConfig.load()
-    pattern = re.compile(config.regex)
+    pattern_text = config.regex
+    if config.tokens:
+        pattern_text = build_regex(config.tokens)
+    pattern = re.compile(pattern_text)
     candidates: List[RenameCandidate] = []
 
     # Files first (top-down walk)

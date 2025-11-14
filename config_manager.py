@@ -23,6 +23,7 @@ DEFAULT_TOKENS: List[str] = [
     "En,Fr,De,Es,It,Nl",
     "En,Fr,Es,Pt",
     "USA, Europe",
+    "USA,EU,JP",
     "Virtual Console",
     "En,Fr,De,Es,It,Ni,Sv",
     "En,Es,Fi",
@@ -118,13 +119,17 @@ class AppConfig:
         try:
             data = json.loads(path.read_text())
             tokens = data.get("tokens")
-            return cls(
+            config = cls(
                 regex=data.get("regex", DEFAULT_PATTERN),
                 rename_directories=data.get("rename_directories", True),
                 rename_root=data.get("rename_root", True),
                 stop_on_error=data.get("stop_on_error", False),
                 tokens=tokens if isinstance(tokens, list) else DEFAULT_TOKENS.copy(),
             )
+            if config.tokens:
+                rebuilt = build_regex(config.tokens)
+                config.regex = rebuilt
+            return config
         except (json.JSONDecodeError, OSError):
             config = cls()
             config.save(path)
