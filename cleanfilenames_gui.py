@@ -44,21 +44,23 @@ PRESETS = {
 }
 
 HELP_TEXT = (
-    "Tokens represent the literal text that appears inside parentheses in your "
-    "filenames (for example: USA, Europe, En,Fr,De,Es,It). Each token can contain "
-    "commas or other characters; the tool treats the token as-is when rebuilding "
-    "the regex.\n\n"
-    "The regex is generated using the template:\n"
-    "    \\s*\\((?:token1|token2|token3)\\)\\s*\n"
-    "Any parentheses containing one of those tokens (with optional spaces) will be "
-    "removed from filenames.\n\n"
-    "Customize it by:\n"
-    "  • Choosing a preset to load a known token list.\n"
-    "  • Editing tokens (one per line). The regex updates automatically.\n"
-    "  • Pasting a custom regex (advanced users). The mode switches to 'Custom'.\n"
-    "  • Loading or saving regex text files for reuse.\n\n"
-    "Tokens may include regex syntax if you need pattern matching (e.g., v\\d+\\.\\d+), "
-    "but keep in mind that the entire token is inserted directly into the regex."
+    "Each token represents an entire region string that appears inside the parentheses.\n"
+    "For example, if your files are named:\n"
+    "  • Game 1 (USA,EU,JP).zip\n"
+    "  • Game 2 (En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar).zip\n"
+    "then you need two tokens:\n"
+    "  USA,EU,JP\n"
+    "  En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar\n\n"
+    "When the tool rebuilds the regex, those tokens become part of the expression:\n"
+    "  \\s*\\((?:USA,EU,JP|En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar|...)\\)\\s*\n"
+    "Any parentheses containing one of those tokens (with optional spaces) will be removed.\n\n"
+    "Ways to customize:\n"
+    "  • Choose a preset to load a known token list.\n"
+    "  • Edit tokens (one per line). The regex updates automatically.\n"
+    "  • Paste a custom regex (advanced users). The mode switches to 'Custom'.\n"
+    "  • Load/Save buttons let you import/export plain-text regex files.\n\n"
+    "Tokens may include regex syntax if you intentionally want pattern matching (e.g., v\\d+\\.\\d+), "
+    "but remember that the entire token is inserted into the regex as-is."
 )
 
 if __package__:
