@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import List
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -24,12 +25,23 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QPlainTextEdit,
+    QComboBox,
 )
 
 try:  # pragma: no cover
-    from .config_manager import AppConfig, DEFAULT_PATTERN  # type: ignore
+    from .config_manager import (  # type: ignore
+        AppConfig,
+        DEFAULT_PATTERN,
+        DEFAULT_TOKENS,
+        build_regex,
+    )
 except ImportError:  # pragma: no cover
-    from config_manager import AppConfig, DEFAULT_PATTERN
+    from config_manager import AppConfig, DEFAULT_PATTERN, DEFAULT_TOKENS, build_regex
+
+PRESETS = {
+    "Full (default)": DEFAULT_TOKENS,
+    "Minimal (USA/EU/JP)": ["USA", "Europe", "JP", "PAL", "World"],
+}
 
 if __package__:
     from .cleanfilenames_core import apply_candidates, collect_candidates, summarize
@@ -211,13 +223,39 @@ class SettingsDialog(QDialog):
     def __init__(self, config: AppConfig, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self._config = config
+        self.tokens = list(config.tokens or DEFAULT_TOKENS)
 
         layout = QVBoxLayout(self)
 
+        preset_layout = QHBoxLayout()
+        preset_layout.addWidget(QLabel("Preset:"))
+        self.preset_combo = QComboBox()
+        for name in PRESETS.keys():
+            self.preset_combo.addItem(name)
+        self.preset_combo.addItem("Custom")
+        self.preset_combo.currentTextChanged.connect(self.on_preset_changed)
+        preset_layout.addWidget(self.preset_combo)
+
+        tokens_btn = QPushButton("Edit Tokens…")
+        tokens_btn.clicked.connect(self.edit_tokens)
+        preset_layout.addWidget(tokens_btn)
+
+        load_btn = QPushButton("Load Pattern…")
+        load_btn.clicked.connect(self.load_pattern)
+        preset_layout.addWidget(load_btn)
+
+        save_btn = QPushButton("Save Pattern…")
+        save_btn.clicked.connect(self.save_pattern)
+        preset_layout.addWidget(save_btn)
+
+        layout.addLayout(preset_layout)
+
+        layout.addWidget(QLabel("Region regex:"))
         self.regex_edit = QPlainTextEdit()
         self.regex_edit.setPlainText(config.regex)
         self.regex_edit.setMinimumHeight(120)
+        self.regex_edit.textChanged.connect(self.set_preset_by_regex)
+        layout.addWidget(self.regex_edit)
 
         self.rename_dirs_cb = QCheckBox("Rename directories")
         self.rename_dirs_cb.setChecked(config.rename_directories)
@@ -228,8 +266,6 @@ class SettingsDialog(QDialog):
         self.stop_on_error_cb = QCheckBox("Stop on first error")
         self.stop_on_error_cb.setChecked(config.stop_on_error)
 
-        layout.addWidget(QLabel("Region regex:"))
-        layout.addWidget(self.regex_edit)
         layout.addWidget(self.rename_dirs_cb)
         layout.addWidget(self.rename_root_cb)
         layout.addWidget(self.stop_on_error_cb)
@@ -239,13 +275,106 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        self.set_preset_by_regex()
+
     def result_config(self) -> AppConfig:
+        regex = self.current_regex() or DEFAULT_PATTERN
+        tokens_to_store = None
+        if self.tokens and regex == build_regex(self.tokens):
+            tokens_to_store = list(self.tokens)
         return AppConfig(
-            regex=self.regex_edit.toPlainText().strip() or DEFAULT_PATTERN,
+            regex=regex,
             rename_directories=self.rename_dirs_cb.isChecked(),
             rename_root=self.rename_root_cb.isChecked(),
             stop_on_error=self.stop_on_error_cb.isChecked(),
+            tokens=tokens_to_store,
         )
+
+    def current_regex(self) -> str:
+        return self.regex_edit.toPlainText().strip()
+
+    def on_preset_changed(self, name: str) -> None:
+        if name in PRESETS:
+            self.tokens = list(PRESETS[name])
+            self._set_regex_from_tokens()
+
+    def _set_regex_from_tokens(self) -> None:
+        pattern = build_regex(self.tokens)
+        self.regex_edit.blockSignals(True)
+        self.regex_edit.setPlainText(pattern)
+        self.regex_edit.blockSignals(False)
+
+    def set_preset_by_regex(self) -> None:
+        regex = self.current_regex()
+        for name, tokens in PRESETS.items():
+            if regex == build_regex(tokens):
+                self._set_preset(name)
+                self.tokens = list(tokens)
+                return
+        self._set_preset("Custom")
+
+    def _set_preset(self, name: str) -> None:
+        idx = self.preset_combo.findText(name)
+        if idx >= 0 and self.preset_combo.currentIndex() != idx:
+            self.preset_combo.blockSignals(True)
+            self.preset_combo.setCurrentIndex(idx)
+            self.preset_combo.blockSignals(False)
+
+    def edit_tokens(self) -> None:
+        dialog = TokensDialog(self.tokens, self)
+        if dialog.exec() == QDialog.Accepted:
+            new_tokens = dialog.tokens()
+            if new_tokens:
+                self.tokens = new_tokens
+                self._set_regex_from_tokens()
+                self._set_preset("Custom")
+
+    def load_pattern(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Pattern", str(Path.home()), "Text Files (*.txt);;All Files (*)"
+        )
+        if not path:
+            return
+        try:
+            text = Path(path).read_text().strip()
+        except OSError as exc:
+            QMessageBox.warning(self, "Load failed", str(exc))
+            return
+        if text:
+            self.regex_edit.blockSignals(True)
+            self.regex_edit.setPlainText(text)
+            self.regex_edit.blockSignals(False)
+            self.tokens = []
+            self._set_preset("Custom")
+
+    def save_pattern(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Pattern", str(Path.home() / "pattern.txt"), "Text Files (*.txt);;All Files (*)"
+        )
+        if not path:
+            return
+        try:
+            Path(path).write_text(self.current_regex() or DEFAULT_PATTERN)
+        except OSError as exc:
+            QMessageBox.warning(self, "Save failed", str(exc))
+
+
+class TokensDialog(QDialog):
+    def __init__(self, tokens: List[str], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Edit Tokens")
+        layout = QVBoxLayout(self)
+        self.text = QPlainTextEdit("\n".join(tokens))
+        self.text.setMinimumHeight(200)
+        layout.addWidget(QLabel("One token per line (raw regex segments)."))
+        layout.addWidget(self.text)
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def tokens(self) -> List[str]:
+        return [line.strip() for line in self.text.toPlainText().splitlines() if line.strip()]
 
     def update_table(self) -> None:
         self.table.setRowCount(0)

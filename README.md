@@ -41,6 +41,7 @@ Settings are stored in `~/.config/cleanfilenames/config.json` (auto-created the 
 ```
 
 - `regex`: pattern used to strip region tags.
+- `tokens`: optional list of region keywords (used to rebuild the regex).
 - `rename_directories`: toggle directory renaming.
 - `rename_root`: allow renaming the selected root folder.
 - `stop_on_error`: halt processing on the first failure.
@@ -72,7 +73,11 @@ python3 cleanfilenames_gui.py
 Features:
 - Browse for a folder, scan, and apply changes.
 - Dry run mode to simulate renames (status column shows "done (dry run)").
-- Config dialog to edit the regex and rename/stop-on-error toggles.
+- Settings dialog with:
+  - Preset selector (full list vs. minimal list vs. custom).
+  - Token editor (one region token per line, rebuilt into the regex).
+  - Load/save buttons for importing/exporting regex patterns.
+  - Toggles for directory/root renames and stop-on-error behavior.
 
 ## Building a Windows `.exe`
 
