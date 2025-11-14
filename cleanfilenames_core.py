@@ -125,6 +125,29 @@ def collect_candidates(
                     )
                 )
 
+    dir_map: dict[Path, Path] = {root_path: root_path}
+    dir_candidates = [c for c in candidates if c.item_type == "directory"]
+    for cand in sorted(dir_candidates, key=lambda c: len(c.path.parts)):
+        parent_new = dir_map.get(cand.path.parent, cand.path.parent)
+        cand.new_path = parent_new / cand.new_name
+        dir_map[cand.path] = cand.new_path
+
+    root_target = dir_map.get(root_path, root_path)
+
+    for cand in candidates:
+        if cand.item_type == "file":
+            parent_new = dir_map.get(cand.path.parent, cand.path.parent)
+            cand.new_path = parent_new / cand.new_name
+            target_parent = cand.new_path.parent
+        else:
+            target_parent = cand.new_path
+
+        try:
+            rel = target_parent.relative_to(root_target)
+            cand.relative_path = str(rel) if rel != Path(".") else "."
+        except ValueError:
+            cand.relative_path = str(target_parent)
+
     return candidates
 
 

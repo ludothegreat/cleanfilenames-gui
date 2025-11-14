@@ -96,6 +96,7 @@ Features:
 - Built-in help dialog explaining tokens, patterns, and customization paths.
 - Table results support `Ctrl+C`/`Cmd+C` to copy selected rows as tab-separated text.
 - Right-click the results to export CSV; the table includes a "Directory" column so you can see the path relative to the scan root (e.g., `Extras/Music/Track 01`). This mirrors the on-disk rename order.
+- For large scans, the table shows the first 5,000 rows; use the CSV export to review the full list.
 
 ## Building a Windows `.exe`
 

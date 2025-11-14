@@ -87,6 +87,7 @@ class MainWindow(QMainWindow):
         self.resize(1100, 650)
         self.candidates = []
         self.current_path: Path | None = None
+        self.row_index_map: List[int] = []
 
         container = QWidget()
         self.setCentralWidget(container)
@@ -129,9 +130,9 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.summary_label)
 
         # Table of changes
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(
-            ["Type", "Original Path", "New Path", "Status", "Message", "Directory"]
+            ["Type", "Original (rel)", "New (rel)", "Status", "Message"]
         )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -276,27 +277,50 @@ class MainWindow(QMainWindow):
             )
 
     def update_table(self) -> None:
+        MAX_ROWS = 5000
+        total = len(self.candidates)
+        truncated = total > MAX_ROWS
+        display_pairs = list(enumerate(self.candidates[:MAX_ROWS]))
+        self.row_index_map = [idx for idx, _ in display_pairs]
+
+        self.table.setUpdatesEnabled(False)
         self.table.setRowCount(0)
-        for cand in self.candidates:
+        for idx, cand in display_pairs:
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(cand.item_type))
-            self.table.setItem(row, 1, QTableWidgetItem(str(cand.path)))
-            self.table.setItem(row, 2, QTableWidgetItem(str(cand.new_path)))
+            orig_item = QTableWidgetItem(cand.original_relative_path or str(cand.path))
+            new_item = QTableWidgetItem(cand.relative_path or str(cand.new_path))
+            self.table.setItem(row, 1, orig_item)
+            self.table.setItem(row, 2, new_item)
             status_item = QTableWidgetItem(cand.status)
             if cand.status == "error":
                 status_item.setForeground(Qt.red)
             elif cand.status.startswith("done"):
                 status_item.setForeground(Qt.darkGreen)
-        self.table.setItem(row, 3, status_item)
-        self.table.setItem(row, 4, QTableWidgetItem(cand.message))
-        rel_item = QTableWidgetItem(cand.relative_path or "")
-        rel_item.setForeground(Qt.gray)
-        self.table.setItem(row, 5, rel_item)
+            self.table.setItem(row, 3, status_item)
+            self.table.setItem(row, 4, QTableWidgetItem(cand.message))
+
+        if truncated:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            note = QTableWidgetItem(f"... {total - MAX_ROWS} more rows not shown ...")
+            note.setForeground(Qt.gray)
+            note.setFlags(Qt.NoItemFlags)
+            self.table.setItem(row, 1, note)
+
+        self.table.setUpdatesEnabled(True)
 
         if not self.candidates:
             self.summary_label.setText("No changes to be made.")
             self.run_btn.setEnabled(False)
+        else:
+            if truncated:
+                self.summary_label.setText(
+                    f"Showing first {MAX_ROWS} of {total} candidates (use CSV export for full list)."
+                )
+            else:
+                self.summary_label.setText(self.summary_label.text())
 
     def copy_selected_rows(self) -> None:
         rows = sorted({index.row() for index in self.table.selectionModel().selectedRows()})
@@ -304,11 +328,13 @@ class MainWindow(QMainWindow):
             return
         lines = []
         for row in rows:
-            if 0 <= row < len(self.candidates):
-                cand = self.candidates[row]
-                lines.append(
-                    f"{cand.item_type}\t{cand.path}\t{cand.new_path}\t{cand.status}\t{cand.message}\t{cand.relative_path}"
-                )
+            if row >= len(self.row_index_map):
+                continue
+            cand = self.candidates[self.row_index_map[row]]
+            lines.append(
+                f"{cand.item_type}\t{cand.original_relative_path or cand.path}\t"
+                f"{cand.relative_path or cand.new_path}\t{cand.status}\t{cand.message}"
+            )
         if lines:
             QApplication.clipboard().setText("\n".join(lines))
 
@@ -332,21 +358,25 @@ class MainWindow(QMainWindow):
         if not path:
             return
         rows = sorted({index.row() for index in self.table.selectionModel().selectedRows()})
-        if not rows:
-            rows = list(range(len(self.candidates)))
-        lines = ["type,old,new,status,message,directory"]
-        for row in rows:
-            if 0 <= row < len(self.candidates):
-                cand = self.candidates[row]
-                fields = [
-                    cand.item_type,
-                    str(cand.path),
-                    str(cand.new_path),
-                    cand.status,
-                    cand.message.replace('"', '""'),
-                ]
-                fields.append(cand.relative_path)
-                lines.append(",".join(f'"{field}"' for field in fields))
+        if rows:
+            candidate_indices = [
+                self.row_index_map[row]
+                for row in rows
+                if row < len(self.row_index_map)
+            ]
+        else:
+            candidate_indices = list(range(len(self.candidates)))
+        lines = ["type,old,new,status,message"]
+        for idx in candidate_indices:
+            cand = self.candidates[idx]
+            fields = [
+                cand.item_type,
+                cand.original_relative_path or str(cand.path),
+                cand.relative_path or str(cand.new_path),
+                cand.status,
+                cand.message.replace('"', '""'),
+            ]
+            lines.append(",".join(f'"{field}"' for field in fields))
         Path(path).write_text("\n".join(lines))
 
 
