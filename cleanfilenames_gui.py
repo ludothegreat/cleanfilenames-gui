@@ -246,6 +246,26 @@ class MainWindow(QMainWindow):
                 "Configuration updated. Please rescan to see new results.",
             )
 
+    def update_table(self) -> None:
+        self.table.setRowCount(0)
+        for cand in self.candidates:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(cand.item_type))
+            self.table.setItem(row, 1, QTableWidgetItem(str(cand.path)))
+            self.table.setItem(row, 2, QTableWidgetItem(str(cand.new_path)))
+            status_item = QTableWidgetItem(cand.status)
+            if cand.status == "error":
+                status_item.setForeground(Qt.red)
+            elif cand.status.startswith("done"):
+                status_item.setForeground(Qt.darkGreen)
+            self.table.setItem(row, 3, status_item)
+            self.table.setItem(row, 4, QTableWidgetItem(cand.message))
+
+        if not self.candidates:
+            self.summary_label.setText("No changes to be made.")
+            self.run_btn.setEnabled(False)
+
 
 class SettingsDialog(QDialog):
     def __init__(self, config: AppConfig, parent: QWidget | None = None) -> None:
@@ -422,26 +442,6 @@ class TokensDialog(QDialog):
 
     def tokens(self) -> List[str]:
         return [line.strip() for line in self.text.toPlainText().splitlines() if line.strip()]
-
-    def update_table(self) -> None:
-        self.table.setRowCount(0)
-        for cand in self.candidates:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(cand.item_type))
-            self.table.setItem(row, 1, QTableWidgetItem(str(cand.path)))
-            self.table.setItem(row, 2, QTableWidgetItem(str(cand.new_path)))
-            status_item = QTableWidgetItem(cand.status)
-            if cand.status == "error":
-                status_item.setForeground(Qt.red)
-            elif cand.status == "done":
-                status_item.setForeground(Qt.darkGreen)
-            self.table.setItem(row, 3, status_item)
-            self.table.setItem(row, 4, QTableWidgetItem(cand.message))
-
-        if not self.candidates:
-            self.summary_label.setText("No changes to be made.")
-            self.run_btn.setEnabled(False)
 
 
 def main() -> None:
