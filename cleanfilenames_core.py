@@ -160,12 +160,30 @@ def collect_candidates(
                     )
                 )
 
+    # Build a complete directory map for ALL directories (not just renamed ones)
+    # This ensures files in non-renamed subdirectories get correct parent paths
     dir_map: dict[Path, Path] = {root_path: root_path}
     dir_candidates = [c for c in candidates if c.item_type == "directory"]
+
+    # First pass: map directories that are being renamed
     for cand in sorted(dir_candidates, key=lambda c: len(c.path.parts)):
         parent_new = dir_map.get(cand.path.parent, cand.path.parent)
         cand.new_path = parent_new / cand.new_name
         dir_map[cand.path] = cand.new_path
+
+    # Second pass: map ALL directories (including non-renamed ones)
+    # by walking the tree and applying parent transformations
+    all_dirs = set()
+    for dirpath, dirnames, _ in os.walk(root_path):
+        all_dirs.add(Path(dirpath))
+        for dirname in dirnames:
+            all_dirs.add(Path(dirpath) / dirname)
+
+    for directory in sorted(all_dirs, key=lambda p: len(p.parts)):
+        if directory not in dir_map:
+            # This directory isn't being renamed, but its parent might be
+            parent_new = dir_map.get(directory.parent, directory.parent)
+            dir_map[directory] = parent_new / directory.name
 
     root_target = dir_map.get(root_path, root_path)
 

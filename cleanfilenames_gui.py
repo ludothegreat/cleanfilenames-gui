@@ -241,12 +241,8 @@ class MainWindow(QMainWindow):
                 f"({summary['errors']} would fail)."
             )
             if summary["errors"]:
-                details = "\n".join(
-                    f"- {c.path} -> {c.new_path}: {c.message}"
-                    for c in self.candidates
-                    if c.status == "error"
-                )
-                QMessageBox.warning(self, "Dry run finished", message + "\n\n" + details)
+                message += "\n\nErrors are shown in the results table below."
+                QMessageBox.warning(self, "Dry run finished", message)
             else:
                 QMessageBox.information(self, "Dry run finished", message)
             return
@@ -256,12 +252,8 @@ class MainWindow(QMainWindow):
             f"({summary['errors']} errors)."
         )
         if summary["errors"]:
-            details = "\n".join(
-                f"- {c.path} -> {c.new_path}: {c.message}"
-                for c in self.candidates
-                if c.status == "error"
-            )
-            QMessageBox.warning(self, "Finished with errors", message + "\n\n" + details)
+            message += "\n\nErrors are shown in the results table below."
+            QMessageBox.warning(self, "Finished with errors", message)
         else:
             QMessageBox.information(self, "Finished", message)
 
