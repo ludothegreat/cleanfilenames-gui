@@ -44,6 +44,7 @@ def normalize_name(name: str, pattern: re.Pattern[str] = REGION_PATTERN) -> str:
     new = pattern.sub(" ", name)
     new = re.sub(r"\s{2,}", " ", new)
     new = re.sub(r"\s+([.\]\)])", r"\1", new)
+    new = new.replace("\\", "")
     return new.strip()
 
 
