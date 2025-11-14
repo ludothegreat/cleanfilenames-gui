@@ -84,6 +84,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Clean Filenames")
         self.resize(1100, 650)
         self.candidates = []
+        self.current_path: Path | None = None
 
         container = QWidget()
         self.setCentralWidget(container)
@@ -154,8 +155,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Missing folder", "Please select a folder first.")
             return
 
+        target_path = Path(path_text)
         try:
-            self.candidates = collect_candidates(Path(path_text), config=self.config)
+            self.candidates = collect_candidates(target_path, config=self.config)
+            self.current_path = target_path
         except FileNotFoundError:
             QMessageBox.critical(
                 self,
@@ -195,6 +198,27 @@ class MainWindow(QMainWindow):
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             dry_run = self.dry_run_checkbox.isChecked()
+            if not dry_run:
+                refresh_needed = any(c.status != "pending" for c in self.candidates)
+                if refresh_needed:
+                    if not self.current_path:
+                        QMessageBox.warning(
+                            self,
+                            "No scan data",
+                            "Please scan a folder before running renames.",
+                        )
+                        return
+                    try:
+                        self.candidates = collect_candidates(
+                            self.current_path, config=self.config
+                        )
+                    except FileNotFoundError:
+                        QMessageBox.critical(
+                            self,
+                            "Folder not found",
+                            f"The path '{self.current_path}' no longer exists.",
+                        )
+                        return
             apply_candidates(
                 self.candidates,
                 dry_run=dry_run,
