@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -141,6 +142,7 @@ class MainWindow(QMainWindow):
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        QShortcut(QKeySequence.Copy, self.table, activated=self.copy_selected_rows)
         main_layout.addWidget(self.table, stretch=1)
 
     # slots
@@ -289,6 +291,20 @@ class MainWindow(QMainWindow):
         if not self.candidates:
             self.summary_label.setText("No changes to be made.")
             self.run_btn.setEnabled(False)
+
+    def copy_selected_rows(self) -> None:
+        rows = sorted({index.row() for index in self.table.selectionModel().selectedRows()})
+        if not rows:
+            return
+        lines = []
+        for row in rows:
+            if 0 <= row < len(self.candidates):
+                cand = self.candidates[row]
+                lines.append(
+                    f"{cand.item_type}\t{cand.path}\t{cand.new_path}\t{cand.status}\t{cand.message}"
+                )
+        if lines:
+            QApplication.clipboard().setText("\n".join(lines))
 
 
 class SettingsDialog(QDialog):

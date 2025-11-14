@@ -94,6 +94,7 @@ Features:
   - Load/save buttons for importing/exporting regex patterns.
   - Toggles for directory/root renames and stop-on-error behavior.
 - Built-in help dialog explaining tokens, patterns, and customization paths.
+- Table results support `Ctrl+C`/`Cmd+C` to copy selected rows as tab-separated text.
 
 ## Building a Windows `.exe`
 
