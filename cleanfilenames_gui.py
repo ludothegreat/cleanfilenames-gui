@@ -129,9 +129,9 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.summary_label)
 
         # Table of changes
-        self.table = QTableWidget(0, 5)
+        self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
-            ["Type", "Original Path", "New Path", "Status", "Message"]
+            ["Type", "Original Path", "New Path", "Status", "Message", "Directory"]
         )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -288,8 +288,11 @@ class MainWindow(QMainWindow):
                 status_item.setForeground(Qt.red)
             elif cand.status.startswith("done"):
                 status_item.setForeground(Qt.darkGreen)
-            self.table.setItem(row, 3, status_item)
-            self.table.setItem(row, 4, QTableWidgetItem(cand.message))
+        self.table.setItem(row, 3, status_item)
+        self.table.setItem(row, 4, QTableWidgetItem(cand.message))
+        rel_item = QTableWidgetItem(cand.relative_path or "")
+        rel_item.setForeground(Qt.gray)
+        self.table.setItem(row, 5, rel_item)
 
         if not self.candidates:
             self.summary_label.setText("No changes to be made.")
@@ -304,7 +307,7 @@ class MainWindow(QMainWindow):
             if 0 <= row < len(self.candidates):
                 cand = self.candidates[row]
                 lines.append(
-                    f"{cand.item_type}\t{cand.path}\t{cand.new_path}\t{cand.status}\t{cand.message}"
+                    f"{cand.item_type}\t{cand.path}\t{cand.new_path}\t{cand.status}\t{cand.message}\t{cand.relative_path}"
                 )
         if lines:
             QApplication.clipboard().setText("\n".join(lines))
@@ -331,7 +334,7 @@ class MainWindow(QMainWindow):
         rows = sorted({index.row() for index in self.table.selectionModel().selectedRows()})
         if not rows:
             rows = list(range(len(self.candidates)))
-        lines = ["type,old,new,status,message"]
+        lines = ["type,old,new,status,message,directory"]
         for row in rows:
             if 0 <= row < len(self.candidates):
                 cand = self.candidates[row]
@@ -342,6 +345,7 @@ class MainWindow(QMainWindow):
                     cand.status,
                     cand.message.replace('"', '""'),
                 ]
+                fields.append(cand.relative_path)
                 lines.append(",".join(f'"{field}"' for field in fields))
         Path(path).write_text("\n".join(lines))
 

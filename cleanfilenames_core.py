@@ -28,6 +28,7 @@ class RenameCandidate:
     item_type: str  # "file" or "directory"
     status: str = "pending"  # pending, done, error, skipped
     message: str = ""
+    relative_path: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -87,6 +88,7 @@ def collect_candidates(
                         new_name=new_name,
                         new_path=new_path,
                         item_type="file",
+                        relative_path=str((dir_path / fname).relative_to(root_path)),
                     )
                 )
 
@@ -104,6 +106,7 @@ def collect_candidates(
                         new_name=new_name,
                         new_path=new_path,
                         item_type="directory",
+                        relative_path=str(directory.relative_to(root_path)),
                     )
                 )
     else:
@@ -118,6 +121,7 @@ def collect_candidates(
                         new_name=root_name,
                         new_path=parent / root_name,
                         item_type="directory",
+                        relative_path=".",
                     )
                 )
 
