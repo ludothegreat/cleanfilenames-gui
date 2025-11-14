@@ -27,6 +27,26 @@ pip install --upgrade pip
 pip install PySide6
 ```
 
+## Configuration
+
+Settings are stored in `~/.config/cleanfilenames/config.json` (auto-created the first time you run the tool). Example:
+
+```json
+{
+  "regex": "\\s*\\((?:USA|EU|...)\\)\\s*",
+  "rename_directories": true,
+  "rename_root": true,
+  "stop_on_error": false
+}
+```
+
+- `regex`: pattern used to strip region tags.
+- `rename_directories`: toggle directory renaming.
+- `rename_root`: allow renaming the selected root folder.
+- `stop_on_error`: halt processing on the first failure.
+
+The GUI exposes these settings via the **Settings** dialog; the CLI can load alternate configs with `--config path/to/config.json`.
+
 ## CLI Usage
 
 Preview changes:
@@ -50,10 +70,9 @@ python3 cleanfilenames_gui.py
 ```
 
 Features:
-
-- Choose a folder with the Browse button.
-- Click **Scan** to preview all pending renames.
-- Click **Apply Changes** to run them (confirmation required). Collisions/errors are highlighted in the table and summarized in a dialog.
+- Browse for a folder, scan, and apply changes.
+- Dry run mode to simulate renames (status column shows "done (dry run)").
+- Config dialog to edit the regex and rename/stop-on-error toggles.
 
 ## Building a Windows `.exe`
 

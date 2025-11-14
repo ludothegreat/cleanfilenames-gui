@@ -21,7 +21,15 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QVBoxLayout,
     QWidget,
+    QDialog,
+    QDialogButtonBox,
+    QPlainTextEdit,
 )
+
+try:  # pragma: no cover
+    from .config_manager import AppConfig, DEFAULT_PATTERN  # type: ignore
+except ImportError:  # pragma: no cover
+    from config_manager import AppConfig, DEFAULT_PATTERN
 
 if __package__:
     from .cleanfilenames_core import apply_candidates, collect_candidates, summarize
@@ -39,7 +47,7 @@ class MainWindow(QMainWindow):
 
         container = QWidget()
         self.setCentralWidget(container)
-
+        self.config = AppConfig.load()
         main_layout = QVBoxLayout(container)
 
         # Path picker
@@ -51,6 +59,9 @@ class MainWindow(QMainWindow):
         path_layout.addWidget(QLabel("Folder:"))
         path_layout.addWidget(self.path_edit, stretch=1)
         path_layout.addWidget(browse_btn)
+        settings_btn = QPushButton("Settings")
+        settings_btn.clicked.connect(self.on_settings)
+        path_layout.addWidget(settings_btn)
         main_layout.addLayout(path_layout)
 
         # Dry run + action buttons
@@ -104,7 +115,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self.candidates = collect_candidates(Path(path_text))
+            self.candidates = collect_candidates(Path(path_text), config=self.config)
         except FileNotFoundError:
             QMessageBox.critical(
                 self,
@@ -141,22 +152,35 @@ class MainWindow(QMainWindow):
         if confirm != QMessageBox.Yes:
             return
 
-        if self.dry_run_checkbox.isChecked():
-            QMessageBox.information(
-                self,
-                "Dry run",
-                "Dry run is enabled. No changes were made.",
-            )
-            return
-
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            apply_candidates(self.candidates)
+            dry_run = self.dry_run_checkbox.isChecked()
+            apply_candidates(
+                self.candidates,
+                dry_run=dry_run,
+                stop_on_error=self.config.stop_on_error,
+            )
             summary = summarize(self.candidates)
         finally:
             QApplication.restoreOverrideCursor()
 
         self.update_table()
+        if dry_run:
+            message = (
+                f"Dry run complete: {summary['completed']} simulated renames "
+                f"({summary['errors']} would fail)."
+            )
+            if summary["errors"]:
+                details = "\n".join(
+                    f"- {c.path} -> {c.new_path}: {c.message}"
+                    for c in self.candidates
+                    if c.status == "error"
+                )
+                QMessageBox.warning(self, "Dry run finished", message + "\n\n" + details)
+            else:
+                QMessageBox.information(self, "Dry run finished", message)
+            return
+
         message = (
             f"Completed {summary['completed']} renames "
             f"({summary['errors']} errors)."
@@ -170,6 +194,58 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Finished with errors", message + "\n\n" + details)
         else:
             QMessageBox.information(self, "Finished", message)
+
+    def on_settings(self) -> None:
+        dialog = SettingsDialog(self.config, self)
+        if dialog.exec() == QDialog.Accepted:
+            self.config = dialog.result_config()
+            self.config.save()
+            QMessageBox.information(
+                self,
+                "Settings saved",
+                "Configuration updated. Please rescan to see new results.",
+            )
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, config: AppConfig, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Settings")
+        self._config = config
+
+        layout = QVBoxLayout(self)
+
+        self.regex_edit = QPlainTextEdit()
+        self.regex_edit.setPlainText(config.regex)
+        self.regex_edit.setMinimumHeight(120)
+
+        self.rename_dirs_cb = QCheckBox("Rename directories")
+        self.rename_dirs_cb.setChecked(config.rename_directories)
+
+        self.rename_root_cb = QCheckBox("Rename root folder")
+        self.rename_root_cb.setChecked(config.rename_root)
+
+        self.stop_on_error_cb = QCheckBox("Stop on first error")
+        self.stop_on_error_cb.setChecked(config.stop_on_error)
+
+        layout.addWidget(QLabel("Region regex:"))
+        layout.addWidget(self.regex_edit)
+        layout.addWidget(self.rename_dirs_cb)
+        layout.addWidget(self.rename_root_cb)
+        layout.addWidget(self.stop_on_error_cb)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def result_config(self) -> AppConfig:
+        return AppConfig(
+            regex=self.regex_edit.toPlainText().strip() or DEFAULT_PATTERN,
+            rename_directories=self.rename_dirs_cb.isChecked(),
+            rename_root=self.rename_root_cb.isChecked(),
+            stop_on_error=self.stop_on_error_cb.isChecked(),
+        )
 
     def update_table(self) -> None:
         self.table.setRowCount(0)
