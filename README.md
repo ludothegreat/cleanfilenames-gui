@@ -6,8 +6,10 @@ Python reimplementation of the `cleanfilenames.ps1` utility with both CLI and GU
 
 ```
 cleanfilenames_py/
-├── cleanfilenames_core.py   # Core rename logic + CLI
-├── cleanfilenames_gui.py    # PySide6 GUI
+├── cleanfilenames_core.py              # Core rename logic + CLI
+├── cleanfilenames_gui.py               # PySide6 GUI
+├── config_manager.py                   # Configuration management
+├── generate_cleanfilenames_testdata.py # Test data generator
 ├── __init__.py
 └── README.md
 ```
@@ -98,6 +100,35 @@ Features:
 - Right-click the results to export CSV; the table includes a "Directory" column so you can see the path relative to the scan root (e.g., `Extras/Music/Track 01`). This mirrors the on-disk rename order.
 - For large scans, the table shows the first 5,000 rows; use the CSV export to review the full list.
 
+## Testing
+
+A test data generator is included to create realistic ROM-like test datasets:
+
+```bash
+# Small dataset (~500 files)
+python3 generate_cleanfilenames_testdata.py --small
+
+# Medium dataset (~1500 files)
+python3 generate_cleanfilenames_testdata.py --medium
+
+# Large dataset (~10k files)
+python3 generate_cleanfilenames_testdata.py --large
+```
+
+The generator creates:
+- Realistic ROM filenames with various region tags
+- Nested directory structures (Console/Category)
+- Directory names with region tags
+- Exact collision scenarios (files that would conflict after cleaning)
+- Case-insensitive collision scenarios (for Windows testing)
+- Test data location: `/tmp/clean_test_suite`
+
+After generating, test with:
+```bash
+python3 cleanfilenames_core.py /tmp/clean_test_suite          # Preview
+python3 cleanfilenames_core.py /tmp/clean_test_suite --apply  # Apply
+```
+
 ## Building a Windows `.exe`
 
 1. Install PyInstaller in your (virtual) environment: `pip install pyinstaller`.
@@ -107,8 +138,14 @@ Features:
 ## Notes
 
 - The regex is identical to the PowerShell version for parity.
-- Directories are renamed deepest-first to avoid “path not found” issues.
+- Directories are renamed deepest-first to avoid "path not found" issues.
 - Collisions are reported but not auto-resolved (per current PowerShell behavior).
+
+## TODO
+
+- [ ] **Auto Token Discovery**: When scanning files, detect potential region tokens that aren't in the current config and offer to add them automatically. This would help users discover new patterns without manually editing the token list.
+
+- [ ] **Manual Conflict Resolution**: After scanning, if there are filename collisions or conflicts, allow manual renaming directly in the GUI. This would eliminate the need to use a file manager or CLI to resolve conflicts - everything can be managed in one place.
 
 ## Current Status (2025‑11‑13)
 

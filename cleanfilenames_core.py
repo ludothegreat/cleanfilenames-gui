@@ -203,6 +203,10 @@ def apply_candidates(
     # Track occupied paths using normalized (case-insensitive on Windows/macOS) keys
     occupied: Set[str] = set()
 
+    # Track runtime directory renames (original -> current location)
+    # This is updated as we perform each directory rename
+    dir_renames: dict[Path, Path] = {}
+
     for cand in dirs + files:
         if cand.status != "pending":
             continue
@@ -212,8 +216,10 @@ def apply_candidates(
             source_path = cand.new_path.parent / cand.path.name
             target_path = cand.new_path
         else:
-            source_path = cand.path
-            target_path = cand.path.parent / cand.new_name
+            # For directories, check if the parent has been renamed
+            current_parent = dir_renames.get(cand.path.parent, cand.path.parent)
+            source_path = current_parent / cand.path.name
+            target_path = current_parent / cand.new_name
 
         # Normalize paths for case-insensitive comparison
         source_norm = _normalize_path_for_comparison(source_path)
@@ -240,10 +246,16 @@ def apply_candidates(
             if dry_run:
                 cand.status = "done (dry run)"
                 occupied.add(new_path_norm)
+                # Track dry-run directory renames too for consistency
+                if cand.item_type == "directory":
+                    dir_renames[cand.path] = target_path
             else:
                 source_path.rename(target_path)
                 cand.status = "done"
                 occupied.add(new_path_norm)
+                # Track where this directory actually is now
+                if cand.item_type == "directory":
+                    dir_renames[cand.path] = target_path
         except OSError as exc:
             cand.status = "error"
             cand.message = str(exc)
