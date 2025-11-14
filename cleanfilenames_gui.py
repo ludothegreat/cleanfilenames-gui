@@ -250,6 +250,12 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(preset_layout)
 
+        layout.addWidget(
+            QLabel(
+                "Tokens describe the text that appears inside parentheses (e.g., USA, Europe).\n"
+                "The regex is rebuilt from the token list, but you can paste a custom pattern if needed."
+            )
+        )
         layout.addWidget(QLabel("Region regex:"))
         self.regex_edit = QPlainTextEdit()
         self.regex_edit.setPlainText(config.regex)

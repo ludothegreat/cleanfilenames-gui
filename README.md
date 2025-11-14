@@ -34,6 +34,12 @@ Settings are stored in `~/.config/cleanfilenames/config.json` (auto-created the 
 ```json
 {
   "regex": "\\s*\\((?:USA|EU|...)\\)\\s*",
+  "tokens": [
+    "USA",
+    "Europe",
+    "JP",
+    "PAL"
+  ],
   "rename_directories": true,
   "rename_root": true,
   "stop_on_error": false
@@ -45,6 +51,15 @@ Settings are stored in `~/.config/cleanfilenames/config.json` (auto-created the 
 - `rename_directories`: toggle directory renaming.
 - `rename_root`: allow renaming the selected root folder.
 - `stop_on_error`: halt processing on the first failure.
+
+### Working with Tokens & Patterns
+
+- **Tokens** represent the literal text that appears in parentheses in your filenames (e.g., `USA`, `Europe`, `En,Fr,De,Es,It`). Each token can include commas or other characters; the tool treats it as raw text unless you add regex syntax yourself.
+- The **pattern** is the full regular expression derived from the token list. It adds the wrapping `\s*\((?: ... )\)\s*` around the tokens, which matches any of the listed tokens with surrounding parentheses/spaces.
+- To create your own pattern, either:
+  1. Edit the token list (one token per line) and let the tool rebuild the regex automatically, or
+  2. Paste a fully custom regex into the pattern box (advanced users). When the regex no longer matches a preset, the UI switches to “Custom.”
+- Use the **Load Pattern** button to import a saved regex text file, and **Save Pattern** to export the current regex for reuse or version control.
 
 The GUI exposes these settings via the **Settings** dialog; the CLI can load alternate configs with `--config path/to/config.json`.
 
@@ -75,7 +90,7 @@ Features:
 - Dry run mode to simulate renames (status column shows "done (dry run)").
 - Settings dialog with:
   - Preset selector (full list vs. minimal list vs. custom).
-  - Token editor (one region token per line, rebuilt into the regex).
+  - Token editor (one region token per line, rebuilt into the regex; supports commas and regex syntax if you need ranges).
   - Load/save buttons for importing/exporting regex patterns.
   - Toggles for directory/root renames and stop-on-error behavior.
 
