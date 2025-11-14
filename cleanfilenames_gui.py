@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QHeaderView,
     QVBoxLayout,
     QWidget,
 )
@@ -73,11 +74,11 @@ class MainWindow(QMainWindow):
             ["Type", "Original Path", "New Path", "Status", "Message"]
         )
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, header.ResizeToContents)
-        header.setSectionResizeMode(3, header.ResizeToContents)
-        header.setSectionResizeMode(4, header.Stretch)
-        header.setSectionResizeMode(1, header.Stretch)
-        header.setSectionResizeMode(2, header.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)

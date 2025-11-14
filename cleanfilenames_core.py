@@ -131,9 +131,10 @@ def apply_candidates(candidates: Iterable[RenameCandidate]) -> None:
 def summarize(candidates: Iterable[RenameCandidate]) -> dict:
     """Return simple metrics about rename results."""
     summary = {"total": 0, "files": 0, "directories": 0, "errors": 0, "completed": 0}
+    type_key = {"file": "files", "directory": "directories"}
     for cand in candidates:
         summary["total"] += 1
-        summary[cand.item_type + "s"] += 1
+        summary[type_key.get(cand.item_type, "files")] += 1
         if cand.status == "done":
             summary["completed"] += 1
         if cand.status == "error":
