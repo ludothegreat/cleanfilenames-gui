@@ -12,9 +12,14 @@ from typing import Iterable, List, Optional, Set
 
 # Support both package and script imports
 try:  # pragma: no cover
-    from .config_manager import AppConfig, DEFAULT_PATTERN, build_regex  # type: ignore
+    from .config_manager import (  # type: ignore
+        AppConfig,
+        ConfigLoadError,
+        DEFAULT_PATTERN,
+        build_regex,
+    )
 except ImportError:  # pragma: no cover
-    from config_manager import AppConfig, DEFAULT_PATTERN, build_regex
+    from config_manager import AppConfig, ConfigLoadError, DEFAULT_PATTERN, build_regex
 
 REGION_PATTERN = re.compile(DEFAULT_PATTERN)
 
@@ -191,15 +196,13 @@ def collect_candidates(
         if cand.item_type == "file":
             parent_new = dir_map.get(cand.path.parent, cand.path.parent)
             cand.new_path = parent_new / cand.new_name
-            target_parent = cand.new_path.parent
-        else:
-            target_parent = cand.new_path
 
+        target_path = cand.new_path
         try:
-            rel = target_parent.relative_to(root_target)
+            rel = target_path.relative_to(root_target)
             cand.relative_path = str(rel) if rel != Path(".") else "."
         except ValueError:
-            cand.relative_path = str(target_parent)
+            cand.relative_path = str(target_path)
 
     return candidates
 
@@ -316,11 +319,19 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    config = (
-        AppConfig.load(Path(args.config).expanduser())
-        if args.config
-        else AppConfig.load()
-    )
+    try:
+        config = (
+            AppConfig.load(Path(args.config).expanduser())
+            if args.config
+            else AppConfig.load()
+        )
+    except ConfigLoadError as exc:
+        print(f"Configuration error: {exc}")
+        print(
+            f"Fix or remove '{exc.path}' (it's JSON) and rerun. "
+            "Deleting it will recreate the default settings."
+        )
+        raise SystemExit(2)
     all_candidates = collect_candidates(args.path, config=config)
     if not all_candidates:
         print("No changes to be made.")
@@ -337,10 +348,16 @@ if __name__ == "__main__":
             stop_on_error=config.stop_on_error,
         )
         summary = summarize(all_candidates)
-        print(
-            f"\nCompleted {summary['completed']} renames "
-            f"({summary['errors']} errors)."
-        )
+        if args.dry_run:
+            print(
+                f"\nDry run complete: {summary['completed']} pending renames "
+                f"({summary['errors']} would fail)."
+            )
+        else:
+            print(
+                f"\nCompleted {summary['completed']} renames "
+                f"({summary['errors']} errors)."
+            )
         if summary["errors"]:
             for cand in all_candidates:
                 if cand.status == "error":

@@ -98,6 +98,14 @@ DEFAULT_PATTERN = build_regex(DEFAULT_TOKENS)
 CONFIG_PATH = Path.home() / ".config" / "cleanfilenames" / "config.json"
 
 
+class ConfigLoadError(RuntimeError):
+    """Raised when the application config cannot be loaded."""
+
+    def __init__(self, path: Path, message: str) -> None:
+        self.path = Path(path)
+        super().__init__(message)
+
+
 @dataclass
 class AppConfig:
     regex: str = DEFAULT_PATTERN
@@ -118,22 +126,30 @@ class AppConfig:
 
         try:
             data = json.loads(path.read_text())
-            tokens = data.get("tokens")
-            config = cls(
-                regex=data.get("regex", DEFAULT_PATTERN),
-                rename_directories=data.get("rename_directories", True),
-                rename_root=data.get("rename_root", True),
-                stop_on_error=data.get("stop_on_error", False),
-                tokens=tokens if isinstance(tokens, list) else DEFAULT_TOKENS.copy(),
-            )
-            if config.tokens:
-                rebuilt = build_regex(config.tokens)
-                config.regex = rebuilt
-            return config
-        except (json.JSONDecodeError, OSError):
-            config = cls()
-            config.save(path)
-            return config
+        except json.JSONDecodeError as exc:  # pragma: no cover - depends on user input
+            raise ConfigLoadError(path, f"Failed to parse config: {exc}") from exc
+        except OSError as exc:  # pragma: no cover - depends on filesystem issues
+            raise ConfigLoadError(path, f"Unable to read config: {exc}") from exc
+
+        tokens_field = data.get("tokens", DEFAULT_TOKENS)
+        if tokens_field is None:
+            tokens: Optional[List[str]] = None
+        elif isinstance(tokens_field, list):
+            tokens = list(tokens_field)
+        else:
+            tokens = DEFAULT_TOKENS.copy()
+
+        config = cls(
+            regex=data.get("regex", DEFAULT_PATTERN),
+            rename_directories=data.get("rename_directories", True),
+            rename_root=data.get("rename_root", True),
+            stop_on_error=data.get("stop_on_error", False),
+            tokens=tokens,
+        )
+        if config.tokens is not None:
+            rebuilt = build_regex(config.tokens)
+            config.regex = rebuilt
+        return config
 
     def save(self, path: Optional[Path] = None) -> None:
         path = path or CONFIG_PATH
@@ -147,4 +163,5 @@ __all__ = [
     "DEFAULT_TOKENS",
     "build_regex",
     "CONFIG_PATH",
+    "ConfigLoadError",
 ]

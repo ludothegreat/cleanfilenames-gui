@@ -34,12 +34,19 @@ from PySide6.QtWidgets import (
 try:  # pragma: no cover
     from .config_manager import (  # type: ignore
         AppConfig,
+        ConfigLoadError,
         DEFAULT_PATTERN,
         DEFAULT_TOKENS,
         build_regex,
     )
 except ImportError:  # pragma: no cover
-    from config_manager import AppConfig, DEFAULT_PATTERN, DEFAULT_TOKENS, build_regex
+    from config_manager import (
+        AppConfig,
+        ConfigLoadError,
+        DEFAULT_PATTERN,
+        DEFAULT_TOKENS,
+        build_regex,
+    )
 
 PRESETS = {
     "Full (default)": DEFAULT_TOKENS,
@@ -551,7 +558,19 @@ class TokensDialog(QDialog):
 
 def main() -> None:
     app = QApplication(sys.argv)
-    window = MainWindow()
+    try:
+        window = MainWindow()
+    except ConfigLoadError as exc:
+        QMessageBox.critical(
+            None,
+            "Configuration Error",
+            (
+                f"{exc}\n\n"
+                f"Fix the JSON in '{exc.path}' or delete the file to regenerate "
+                "the default settings, then relaunch the app."
+            ),
+        )
+        return
     window.show()
     sys.exit(app.exec())
 
