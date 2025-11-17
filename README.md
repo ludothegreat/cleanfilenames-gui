@@ -95,6 +95,7 @@ Features:
   - Token editor (one region token per line, rebuilt into the regex; supports commas and regex syntax if you need ranges).
   - Load/save buttons for importing/exporting regex patterns.
   - Toggles for directory/root renames and stop-on-error behavior.
+- Token Manager dialog that tracks duplicate tokens, shows usage counts from the latest scan, and lets you append auto-detected suggestions with a couple of clicks.
 - Built-in help dialog explaining tokens, patterns, and customization paths.
 - Table results support `Ctrl+C`/`Cmd+C` to copy selected rows as tab-separated text.
 - Right-click the results to export CSV; the table includes a "Directory" column so you can see the path relative to the scan root (e.g., `Extras/Music/Track 01`). This mirrors the on-disk rename order.
@@ -143,9 +144,10 @@ python3 cleanfilenames_core.py /tmp/clean_test_suite --apply  # Apply
 
 ## TODO
 
-- [ ] **Auto Token Discovery**: When scanning files, detect potential region tokens that aren't in the current config and offer to add them automatically. This would help users discover new patterns without manually editing the token list.
+- [x] **Auto Token Discovery**: When scanning files, detect potential region tokens that aren't in the current config and offer to add them automatically. This would help users discover new patterns without manually editing the token list.
 
 - [ ] **Manual Conflict Resolution**: After scanning, if there are filename collisions or conflicts, allow manual renaming directly in the GUI. This would eliminate the need to use a file manager or CLI to resolve conflicts - everything can be managed in one place.
+- [ ] **Result Sorting & Filtering**: Allow sorting the scan results by type/status/message and filter the table down to only passed/failed entries for easier triage.
 
 ## Current Status (2025‑11‑13)
 

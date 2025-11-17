@@ -59,8 +59,6 @@ DEFAULT_TOKENS: List[str] = [
     "En,Fr",
     "En,Fr,Es,It,Ja",
     "USA,Asia",
-    "USA",
-    "En,Fr,De",
     "USA,Korea",
     "En,Ja,Fr,De,Es,It,Pt,Pl,Ru",
     "En,Es,It",
@@ -75,7 +73,6 @@ DEFAULT_TOKENS: List[str] = [
     "En,Zh",
     "En,Fr,De,Es,It,Pt,Ru",
     "En,Ja,Fr,De,Es,It,Ko",
-    "En,Fr,Es,Pt",
     "En,Ja,Fr,De,Es,It",
     "v2.02",
     "En,Ja,Fr,Es",
@@ -146,7 +143,7 @@ class AppConfig:
             stop_on_error=data.get("stop_on_error", False),
             tokens=tokens,
         )
-        if config.tokens is not None:
+        if config.tokens:
             rebuilt = build_regex(config.tokens)
             config.regex = rebuilt
         return config

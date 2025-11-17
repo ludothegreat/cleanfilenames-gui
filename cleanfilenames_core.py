@@ -18,8 +18,10 @@ try:  # pragma: no cover
         DEFAULT_PATTERN,
         build_regex,
     )
+    from .token_manager import TokenTracker
 except ImportError:  # pragma: no cover
     from config_manager import AppConfig, ConfigLoadError, DEFAULT_PATTERN, build_regex
+    from token_manager import TokenTracker
 
 REGION_PATTERN = re.compile(DEFAULT_PATTERN)
 
@@ -95,7 +97,10 @@ def _iter_directories(root: Path) -> Iterable[Path]:
 
 
 def collect_candidates(
-    root: Path | str, *, config: Optional[AppConfig] = None
+    root: Path | str,
+    *,
+    config: Optional[AppConfig] = None,
+    token_tracker: Optional["TokenTracker"] = None,
 ) -> List[RenameCandidate]:
     """Scan for files and directories whose names need adjustments."""
     root_path = Path(root).expanduser().resolve()
@@ -109,10 +114,18 @@ def collect_candidates(
     pattern = re.compile(pattern_text)
     candidates: List[RenameCandidate] = []
 
+    if token_tracker:
+        token_tracker.observe(root_path.name, root_path)
+
     # Files first (top-down walk)
-    for dirpath, _, filenames in os.walk(root_path):
+    for dirpath, dirnames, filenames in os.walk(root_path):
         dir_path = Path(dirpath)
+        if token_tracker:
+            for dirname in dirnames:
+                token_tracker.observe(dirname, dir_path / dirname)
         for fname in filenames:
+            if token_tracker:
+                token_tracker.observe(fname, dir_path / fname)
             new_name = normalize_name(fname, pattern)
             if new_name != fname:
                 path = dir_path / fname
@@ -223,6 +236,7 @@ def apply_candidates(
 
     # Track occupied paths using normalized (case-insensitive on Windows/macOS) keys
     occupied: Set[str] = set()
+    target_map: dict[str, Path] = {}
 
     # Track runtime directory renames (original -> current location)
     # This is updated as we perform each directory rename
@@ -250,23 +264,27 @@ def apply_candidates(
         # Check if target already exists (case-insensitive on Windows/macOS)
         if target_path.exists() and target_norm != source_norm:
             cand.status = "error"
-            cand.message = "Target already exists (case-insensitive collision)"
+            cand.message = f"Target already exists on disk: {target_path}"
+            cand.relative_path = str(target_path)
             continue
         if cand.new_path.exists() and new_path_norm != source_norm:
             cand.status = "error"
-            cand.message = "Target already exists (case-insensitive collision)"
+            cand.message = f"Target already exists on disk: {cand.new_path}"
             continue
 
         # Check if another pending rename will create this same target
         if new_path_norm in occupied and new_path_norm != source_norm:
+            other = target_map.get(new_path_norm)
+            other_desc = f": {other}" if other else ""
             cand.status = "error"
-            cand.message = "Another item already targets this name"
+            cand.message = f"Multiple items are targeting this name{other_desc}"
             continue
 
         try:
             if dry_run:
                 cand.status = "done (dry run)"
                 occupied.add(new_path_norm)
+                target_map[new_path_norm] = target_path
                 # Track dry-run directory renames too for consistency
                 if cand.item_type == "directory":
                     dir_renames[cand.path] = target_path
@@ -274,6 +292,7 @@ def apply_candidates(
                 source_path.rename(target_path)
                 cand.status = "done"
                 occupied.add(new_path_norm)
+                target_map[new_path_norm] = target_path
                 # Track where this directory actually is now
                 if cand.item_type == "directory":
                     dir_renames[cand.path] = target_path
