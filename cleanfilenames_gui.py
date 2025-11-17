@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QGroupBox,
     QInputDialog,
+    QScrollArea,
 )
 
 try:  # pragma: no cover
