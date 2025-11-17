@@ -929,9 +929,12 @@ class ConflictResolutionDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Resolve Conflict")
-        self._candidates = candidates
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Conflicting items:"))
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
         self.editors: List[tuple[RenameCandidate, QLineEdit]] = []
         for idx, cand in enumerate(candidates, start=1):
             group = QGroupBox(f"Item {idx}")
@@ -942,8 +945,11 @@ class ConflictResolutionDialog(QDialog):
             edit = QLineEdit(cand.new_name)
             group_layout.addWidget(QLabel("Target name:"))
             group_layout.addWidget(edit)
-            layout.addWidget(group)
+            container_layout.addWidget(group)
             self.editors.append((cand, edit))
+        container_layout.addStretch(1)
+        scroll.setWidget(container)
+        layout.addWidget(scroll)
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
