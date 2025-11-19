@@ -223,10 +223,13 @@ def collect_candidates(
 def apply_candidates(
     candidates: Iterable[RenameCandidate],
     *,
+    config: AppConfig,
     dry_run: bool = False,
-    stop_on_error: bool = False,
 ) -> None:
     """Attempt to rename every candidate in-place."""
+    stop_on_error = config.stop_on_error
+    auto_resolve = config.auto_resolve_conflicts
+
     dirs = sorted(
         [c for c in candidates if c.item_type == "directory"],
         key=lambda cand: len(cand.path.parts),
@@ -256,36 +259,55 @@ def apply_candidates(
             source_path = current_parent / cand.path.name
             target_path = current_parent / cand.new_name
 
-        # Normalize paths for case-insensitive comparison
-        source_norm = _normalize_path_for_comparison(source_path)
-        target_norm = _normalize_path_for_comparison(target_path)
-        new_path_norm = _normalize_path_for_comparison(cand.new_path)
+        # --- Collision detection and resolution ---
+        i = 1
+        resolved_path = target_path
+        while True:
+            resolved_norm = _normalize_path_for_comparison(resolved_path)
+            
+            # Check for existing file on disk or a pending rename targeting the same path
+            is_disk_conflict = resolved_path.exists() and resolved_norm != _normalize_path_for_comparison(source_path)
+            is_pending_conflict = resolved_norm in occupied and resolved_norm != _normalize_path_for_comparison(source_path)
 
-        # Check if target already exists (case-insensitive on Windows/macOS)
-        if target_path.exists() and target_norm != source_norm:
-            cand.status = "error"
-            cand.message = f"Target already exists on disk: {target_path}"
-            cand.relative_path = str(target_path)
-            continue
-        if cand.new_path.exists() and new_path_norm != source_norm:
-            cand.status = "error"
-            cand.message = f"Target already exists on disk: {cand.new_path}"
+            if not is_disk_conflict and not is_pending_conflict:
+                if resolved_path != target_path:
+                    cand.message = f"Resolved to '{resolved_path.name}'"
+                break  # No conflict, we can proceed
+
+            if not auto_resolve:
+                cand.status = "error"
+                if is_disk_conflict:
+                    cand.message = f"Target already exists on disk: {resolved_path}"
+                else:
+                    other = target_map.get(resolved_norm)
+                    other_desc = f": {other}" if other else ""
+                    cand.message = f"Multiple items are targeting this name{other_desc}"
+                break  # Break inner while, outer for-loop continues
+
+            # Auto-resolve is on, so try to find a new name
+            stem = target_path.stem
+            ext = target_path.suffix
+            new_name = f"{stem} ({i}){ext}"
+            resolved_path = target_path.with_name(new_name)
+            i += 1
+            if i > 100:  # Safety break
+                cand.status = "error"
+                cand.message = "Could not find a free filename after 100 attempts."
+                break
+        
+        if cand.status == "error":
+            if stop_on_error:
+                break
             continue
 
-        # Check if another pending rename will create this same target
-        if new_path_norm in occupied and new_path_norm != source_norm:
-            other = target_map.get(new_path_norm)
-            other_desc = f": {other}" if other else ""
-            cand.status = "error"
-            cand.message = f"Multiple items are targeting this name{other_desc}"
-            continue
+        target_path = resolved_path
+        new_path_norm = _normalize_path_for_comparison(target_path)
 
         try:
             if dry_run:
                 cand.status = "done (dry run)"
                 occupied.add(new_path_norm)
                 target_map[new_path_norm] = target_path
-                # Track dry-run directory renames too for consistency
                 if cand.item_type == "directory":
                     dir_renames[cand.path] = target_path
             else:
@@ -293,12 +315,12 @@ def apply_candidates(
                 cand.status = "done"
                 occupied.add(new_path_norm)
                 target_map[new_path_norm] = target_path
-                # Track where this directory actually is now
                 if cand.item_type == "directory":
                     dir_renames[cand.path] = target_path
         except OSError as exc:
             cand.status = "error"
             cand.message = str(exc)
+        
         if cand.status == "error" and stop_on_error:
             break
 
@@ -337,6 +359,7 @@ if __name__ == "__main__":
         help="Explicitly skip renames even if --apply is provided.",
     )
     args = parser.parse_args()
+    print(f"args.config = {args.config}")
 
     try:
         config = (
@@ -344,12 +367,14 @@ if __name__ == "__main__":
             if args.config
             else AppConfig.load()
         )
-    except ConfigLoadError as exc:
+    except (ConfigLoadError, FileNotFoundError) as exc:
+        print(f"Caught exception: {exc}")
         print(f"Configuration error: {exc}")
-        print(
-            f"Fix or remove '{exc.path}' (it's JSON) and rerun. "
-            "Deleting it will recreate the default settings."
-        )
+        if isinstance(exc, ConfigLoadError):
+            print(
+                f"Fix or remove '{exc.path}' (it's JSON) and rerun. "
+                "Deleting it will recreate the default settings."
+            )
         raise SystemExit(2)
     all_candidates = collect_candidates(args.path, config=config)
     if not all_candidates:
@@ -363,8 +388,8 @@ if __name__ == "__main__":
     if args.apply:
         apply_candidates(
             all_candidates,
+            config=config,
             dry_run=args.dry_run,
-            stop_on_error=config.stop_on_error,
         )
         summary = summarize(all_candidates)
         if args.dry_run:

@@ -5,7 +5,37 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Set
+
+TOKEN_FINDER = re.compile(r"\(([^()]+)\)")
+MAX_SAMPLES = 3
+
+# See: https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+INVALID_FILENAME_CHARS: Set[str] = {'<', '>', ':', '"', '/', '\\', '|', '?', '*'}
+
+
+def validate_tokens(tokens: List[str]) -> List[str]:
+    """Check a list of tokens for invalid characters or formatting."""
+    errors: List[str] = []
+    for i, token in enumerate(tokens, 1):
+        # The '|' character is of special concern as it's used as the regex delimiter.
+        # While it's technically a valid regex character, allowing it in a token
+        # is almost always a mistake unless the user is an expert.
+        # We will forbid it to prevent users from shooting themselves in the foot
+        # by creating a file with `token1|token2` on a single line.
+        if '|' in token:
+            errors.append(f"Line {i}: Token contains a '|' character. Each token should be on its own line.")
+
+        # Check for other invalid filename characters.
+        # This is not a perfect regex character validator, but it prevents mistakes.
+        invalid_chars_found = INVALID_FILENAME_CHARS.intersection(token)
+        if invalid_chars_found:
+            # Format the found characters for a readable error message.
+            char_list = ", ".join(f"'{c}'" for c in sorted(list(invalid_chars_found)))
+            errors.append(f"Line {i}: Token contains invalid filename characters: {char_list}")
+            
+    return errors
+
 
 TOKEN_FINDER = re.compile(r"\(([^()]+)\)")
 MAX_SAMPLES = 3
@@ -98,4 +128,5 @@ __all__ = [
     "TokenUsage",
     "find_duplicate_tokens",
     "normalize_token",
+    "validate_tokens",
 ]

@@ -41,13 +41,16 @@ try:  # pragma: no cover
         ConfigLoadError,
         DEFAULT_PATTERN,
         DEFAULT_TOKENS,
+        PRESETS_DIR,
         build_regex,
+        load_preset_tokens,
     )
     from .token_manager import (
         TokenSuggestion,
         TokenTracker,
         find_duplicate_tokens,
         normalize_token,
+        validate_tokens,
     )
 except ImportError:  # pragma: no cover
     from config_manager import (
@@ -55,23 +58,29 @@ except ImportError:  # pragma: no cover
         ConfigLoadError,
         DEFAULT_PATTERN,
         DEFAULT_TOKENS,
+        PRESETS_DIR,
         build_regex,
+        load_preset_tokens,
     )
     from token_manager import (
         TokenSuggestion,
         TokenTracker,
         find_duplicate_tokens,
         normalize_token,
+        validate_tokens,
     )
 
 
 def _normalize_path_for_gui(path: Path) -> str:
     return str(path.resolve()).lower()
 
-PRESETS = {
-    "Full (default)": DEFAULT_TOKENS,
-    "Minimal (USA/EU/JP)": ["USA", "Europe", "JP", "PAL", "World"],
-}
+
+def get_presets() -> List[str]:
+    """Return a list of available preset names."""
+    if not PRESETS_DIR.exists():
+        return []
+    return sorted([p.stem for p in PRESETS_DIR.glob("*.txt")])
+
 
 HELP_TEXT = """
 <h3>Tokens &amp; Regex</h3>
@@ -141,6 +150,10 @@ class MainWindow(QMainWindow):
         controls_layout = QHBoxLayout()
         self.dry_run_checkbox = QCheckBox("Dry run (no changes)")
         self.dry_run_checkbox.setChecked(True)
+        self.auto_resolve_checkbox = QCheckBox("Auto-resolve conflicts")
+        self.auto_resolve_checkbox.setChecked(self.config.auto_resolve_conflicts)
+        self.auto_resolve_checkbox.toggled.connect(self.on_auto_resolve_toggled)
+
         btn_layout = QHBoxLayout()
         self.scan_btn = QPushButton("Scan")
         self.scan_btn.clicked.connect(self.on_scan)
@@ -151,6 +164,7 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(self.run_btn)
         btn_layout.addStretch(1)
         controls_layout.addWidget(self.dry_run_checkbox)
+        controls_layout.addWidget(self.auto_resolve_checkbox)
         controls_layout.addLayout(btn_layout)
         main_layout.addLayout(controls_layout)
 
@@ -311,12 +325,14 @@ class MainWindow(QMainWindow):
         self.update_suggestions_view()
 
     def on_apply(self) -> None:
-        if not self.candidates:
+        if not self.current_path:
+            QMessageBox.warning(self, "No folder scanned", "Please scan a folder first.")
             return
+
         confirm = QMessageBox.question(
             self,
             "Confirm renames",
-            "Apply all pending renames?",
+            f"Apply changes to '{self.current_path.name}'?",
             QMessageBox.Yes | QMessageBox.No,
         )
         if confirm != QMessageBox.Yes:
@@ -324,34 +340,20 @@ class MainWindow(QMainWindow):
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
+            # Always re-collect candidates to get a fresh state from disk
+            # and ensure current settings are applied.
+            self.candidates = collect_candidates(
+                self.current_path, config=self.config, token_tracker=self.token_tracker
+            )
+            if not self.candidates:
+                QMessageBox.information(self, "No changes", "No changes to apply.")
+                return
+
             dry_run = self.dry_run_checkbox.isChecked()
-            if not dry_run:
-                refresh_needed = any(c.status != "pending" for c in self.candidates)
-                if refresh_needed:
-                    if not self.current_path:
-                        QMessageBox.warning(
-                            self,
-                            "No scan data",
-                            "Please scan a folder before running renames.",
-                        )
-                        return
-                    try:
-                        self.candidates = collect_candidates(
-                            self.current_path, config=self.config
-                        )
-                        self.current_page = 0
-                    except FileNotFoundError:
-                        QMessageBox.critical(
-                            self,
-                            "Folder not found",
-                            f"The path '{self.current_path}' no longer exists.",
-                        )
-                        self.clear_suggestions()
-                        return
             apply_candidates(
                 self.candidates,
+                config=self.config,
                 dry_run=dry_run,
-                stop_on_error=self.config.stop_on_error,
             )
             summary = summarize(self.candidates)
         finally:
@@ -380,6 +382,13 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.information(self, "Finished", message)
 
+    def on_auto_resolve_toggled(self, checked: bool) -> None:
+        """Update and save the auto-resolve setting."""
+        if self.config.auto_resolve_conflicts == checked:
+            return
+        self.config.auto_resolve_conflicts = checked
+        self.config.save()
+        
     def on_token_manager(self) -> None:
         dialog = TokenManagerDialog(self.config, self)
         dialog.exec()
@@ -764,33 +773,64 @@ class TokenManagerDialog(QDialog):
         self.resize(600, 480)
         self.config = config
         self._config_updated = False
+        self.current_preset_name: Optional[str] = None
+        self.current_preset_tokens: List[str] = []
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Tokens (one per line, raw text or regex allowed):"))
+        
+        self.warning_text = QTextBrowser()
+        self.warning_text.setReadOnly(True)
+        self.warning_text.setStyleSheet("background-color: #fffacd; border: 1px solid #ffebcd; padding: 5px;")
+        self.warning_text.setMaximumHeight(60)
+        self.warning_text.setVisible(False)
+        layout.addWidget(self.warning_text)
+
         tokens_source = config.tokens if config.tokens is not None else DEFAULT_TOKENS
         tokens_text = "\n".join(tokens_source)
         self.token_edit = QPlainTextEdit(tokens_text)
         self.token_edit.setMinimumHeight(260)
         self.token_edit.textChanged.connect(self.refresh_duplicate_notice)
+        self.token_edit.textChanged.connect(self.update_warning_message)
         layout.addWidget(self.token_edit)
 
         action_layout = QHBoxLayout()
+        self.preset_combo = QComboBox()
+        action_layout.addWidget(self.preset_combo)
+        load_preset_btn = QPushButton("Load Preset")
+        load_preset_btn.clicked.connect(self.load_preset)
+        action_layout.addWidget(load_preset_btn)
+        action_layout.addStretch(1)
+
+        # Determine initial preset state for warning message
+        default_preset_tokens = load_preset_tokens("default")
+        minimal_preset_tokens = load_preset_tokens("minimal")
+        current_config_tokens = config.tokens if config.tokens is not None else []
+        
+        if sorted(current_config_tokens) == sorted(default_preset_tokens):
+            self.current_preset_name = "default"
+            self.current_preset_tokens = default_preset_tokens
+        elif sorted(current_config_tokens) == sorted(minimal_preset_tokens):
+            self.current_preset_name = "minimal"
+            self.current_preset_tokens = minimal_preset_tokens
+        else:
+            self.current_preset_name = None
+            self.current_preset_tokens = list(current_config_tokens)
+
         import_btn = QPushButton("Import List…")
         import_btn.clicked.connect(self.import_tokens)
         action_layout.addWidget(import_btn)
         export_btn = QPushButton("Export List…")
         export_btn.clicked.connect(self.export_tokens)
         action_layout.addWidget(export_btn)
-        load_defaults_btn = QPushButton("Load Defaults")
-        load_defaults_btn.clicked.connect(self.load_default_tokens)
-        action_layout.addWidget(load_defaults_btn)
+
         help_btn = QPushButton("Regex Help…")
         help_btn.clicked.connect(self.show_help)
         action_layout.addWidget(help_btn)
+
         self.remove_dupes_btn = QPushButton("Remove Duplicates")
         self.remove_dupes_btn.clicked.connect(self.remove_duplicates)
         action_layout.addWidget(self.remove_dupes_btn)
-        action_layout.addStretch(1)
         layout.addLayout(action_layout)
 
         self.duplicate_display = QPlainTextEdit()
@@ -803,6 +843,8 @@ class TokenManagerDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        self.refresh_presets()
+        self.update_warning_message()
         self.refresh_duplicate_notice()
 
     @property
@@ -815,6 +857,29 @@ class TokenManagerDialog(QDialog):
             for line in self.token_edit.toPlainText().splitlines()
             if line.strip()
         ]
+
+    def update_warning_message(self) -> None:
+        """Display a warning if a default/minimal preset is loaded and being edited."""
+        if not self.current_preset_name:
+            self.warning_text.setVisible(False)
+            return
+
+        current_tokens_in_editor = self.current_tokens()
+        
+        # Compare current editor tokens with the last loaded preset tokens
+        if sorted(current_tokens_in_editor) == sorted(self.current_preset_tokens):
+            if self.current_preset_name in ["default", "minimal"]:
+                self.warning_text.setHtml(
+                    "<p>You are viewing a <b>predefined token set</b>. "
+                    "Changes will overwrite it globally. "
+                    "For custom tokens, consider saving as a new preset or editing your `config.json`.</p>"
+                )
+                self.warning_text.setVisible(True)
+            else:
+                self.warning_text.setVisible(False)
+        else:
+            # User has modified the tokens, hide the warning
+            self.warning_text.setVisible(False)
 
     def refresh_duplicate_notice(self) -> None:
         tokens = self.current_tokens()
@@ -853,6 +918,14 @@ class TokenManagerDialog(QDialog):
 
     def save_and_close(self) -> None:
         tokens = self.current_tokens()
+        errors = validate_tokens(tokens)
+        if errors:
+            QMessageBox.warning(
+                self,
+                "Invalid Tokens",
+                "Please fix the following errors:\n\n" + "\n".join(errors),
+            )
+            return
         self.apply_tokens(tokens)
         QMessageBox.information(self, "Tokens saved", "Token configuration updated.")
         self.accept()
@@ -865,6 +938,16 @@ class TokenManagerDialog(QDialog):
             return
         try:
             text = Path(path).read_text()
+            tokens = [line.strip() for line in text.splitlines() if line.strip()]
+            errors = validate_tokens(tokens)
+            if errors:
+                QMessageBox.warning(
+                    self,
+                    "Invalid Tokens in File",
+                    f"The file '{Path(path).name}' contains errors:\n\n"
+                    + "\n".join(errors),
+                )
+                return
         except OSError as exc:
             QMessageBox.warning(self, "Import failed", str(exc))
             return
@@ -882,18 +965,49 @@ class TokenManagerDialog(QDialog):
         except OSError as exc:
             QMessageBox.warning(self, "Export failed", str(exc))
 
-    def load_default_tokens(self) -> None:
-        current_text = self.token_edit.toPlainText().strip()
-        if current_text:
+    def refresh_presets(self) -> None:
+        """Scan for presets and populate the dropdown."""
+        self.presets = get_presets()
+        self.preset_combo.clear()
+        if self.presets:
+            self.preset_combo.addItems([p.replace("_", " ").title() for p in self.presets])
+        # After refreshing presets, reset current_preset_name to avoid stale state
+        self.current_preset_name = None
+        self.current_preset_tokens = []
+        self.update_warning_message()
+
+    def load_preset(self) -> None:
+        """Load tokens from the selected preset file."""
+        if not self.presets:
+            QMessageBox.warning(self, "No Presets", "No preset files found in the 'presets' directory.")
+            return
+        
+        selected_index = self.preset_combo.currentIndex()
+        if selected_index == -1: # No preset selected, or list is empty
+            return
+            
+        current_preset_name = self.presets[selected_index]
+        tokens = load_preset_tokens(current_preset_name)
+        
+        if not tokens:
+            QMessageBox.warning(self, "Preset empty", f"Selected preset '{current_preset_name}' is empty or could not be loaded.")
+            return
+
+        current_tokens_in_editor = self.current_tokens()
+        if current_tokens_in_editor:
             confirm = QMessageBox.question(
                 self,
                 "Replace token list?",
-                "This will replace your current tokens with the default set. Continue?",
+                "This will replace your current tokens with the selected preset. Continue?",
                 QMessageBox.Yes | QMessageBox.No,
             )
             if confirm != QMessageBox.Yes:
                 return
-        self.token_edit.setPlainText("\n".join(DEFAULT_TOKENS))
+        
+        self.token_edit.setPlainText("\n".join(tokens))
+        self.current_preset_name = current_preset_name
+        self.current_preset_tokens = tokens
+        self.update_warning_message()
         self.refresh_duplicate_notice()
 
     def show_help(self) -> None:

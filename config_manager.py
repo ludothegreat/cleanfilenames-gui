@@ -7,89 +7,26 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import List, Optional
 
-DEFAULT_TOKENS: List[str] = [
-    "USA",
-    "EU",
-    "En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar",
-    "En,Fr,De,Es,It,Sv",
-    "En,De,Es,Nl,Sv",
-    "1999-10-29",
-    "1999-05-25",
-    "2000-10-26",
-    "1999-02-25",
-    "En,Fr,De,Es,Sv",
-    "1995-10-25",
-    "En,Fr,De,Es,It,Nl,Sv,No,Da,Fi",
-    "En,Fr,De,Es,It,Nl",
-    "En,Fr,Es,Pt",
-    "USA, Europe",
-    "USA,EU,JP",
-    "Virtual Console",
-    "En,Fr,De,Es,It,Ni,Sv",
-    "En,Es,Fi",
-    "En,Fr,De,Nl,Sv,No,Da",
-    "U",
-    "!",
-    "1996-09-24",
-    "USA,Brazil",
-    "1997-08-11",
-    "1998-08-10",
-    "UnI",
-    "En,Fr,Es,Pt",
-    "Unl",
-    "En,Fr,De,Es,It,Fi",
-    "En,Fr,De,Es,Nl,Sv",
-    "En,De,Es,It",
-    "En,Fr,De,Sv",
-    "2000-07-24",
-    "En,Fr,De,Es,It,Sv",
-    "En,Ja,Fr,De",
-    "1996-11-21",
-    "JP",
-    "UK",
-    "En,Fr,De,Es,It,Pt",
-    "CA",
-    "En,Fr,De,Es,It",
-    "En,Fr,De,Es,Nl,Sv,Da",
-    "En,Fr,De,It",
-    "En,Fr,De,Es,It,Nl,Sv,Da",
-    "En,Fr,De,Es",
-    "En,Ja,Fr,De,Es",
-    "En,Ja",
-    "En,Fr",
-    "En,Fr,Es,It,Ja",
-    "USA,Asia",
-    "USA,Korea",
-    "En,Ja,Fr,De,Es,It,Pt,Pl,Ru",
-    "En,Es,It",
-    "En,Fr,De,Es,It,Ru",
-    "En,Ja,Es",
-    "USA, Canada",
-    "En,Fr,Es",
-    r"v\d+\.\d+",
-    "En,Ja,Fr,De,Es,It,Ko",
-    "En,Es",
-    "USA,Canada",
-    "En,Zh",
-    "En,Fr,De,Es,It,Pt,Ru",
-    "En,Ja,Fr,De,Es,It,Ko",
-    "En,Ja,Fr,De,Es,It",
-    "v2.02",
-    "En,Ja,Fr,Es",
-    "En,De",
-    "Japan",
-    "PAL",
-    "NTSC",
-    "Europe",
-    "World",
-]
+PRESETS_DIR = Path(__file__).parent / "presets"
+
+
+def load_preset_tokens(preset_name: str) -> List[str]:
+    """Load a list of tokens from a preset file."""
+    preset_file = PRESETS_DIR / f"{preset_name}.txt"
+    if not preset_file.exists():
+        return []
+    return [
+        line.strip() for line in preset_file.read_text().splitlines() if line.strip()
+    ]
 
 
 def build_regex(tokens: List[str]) -> str:
+    """Build the regex pattern from a list of tokens."""
     inner = "|".join(filter(None, tokens))
     return rf"\s*\((?:{inner})\)\s*"
 
 
+DEFAULT_TOKENS = load_preset_tokens("default")
 DEFAULT_PATTERN = build_regex(DEFAULT_TOKENS)
 
 CONFIG_PATH = Path.home() / ".config" / "cleanfilenames" / "config.json"
@@ -109,17 +46,29 @@ class AppConfig:
     rename_directories: bool = True
     rename_root: bool = True
     stop_on_error: bool = False
+    auto_resolve_conflicts: bool = False
     tokens: Optional[List[str]] = field(
         default_factory=lambda: DEFAULT_TOKENS.copy()
     )
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "AppConfig":
+        print(f"Loading config from: {path}")
+        is_default_path = path is None
         path = path or CONFIG_PATH
+
         if not path.exists():
-            config = cls()
-            config.save(path)
-            return config
+            print(f"Path does not exist: {path}")
+            if is_default_path:
+                # If using the default path, create it on first run
+                print("Using default path, creating config.")
+                config = cls()
+                config.save(path)
+                return config
+            else:
+                # If a specific path was provided and it doesn't exist, raise an error
+                print("Raising FileNotFoundError")
+                raise FileNotFoundError(f"Config file not found at specified path: {path}")
 
         try:
             data = json.loads(path.read_text())
@@ -141,6 +90,7 @@ class AppConfig:
             rename_directories=data.get("rename_directories", True),
             rename_root=data.get("rename_root", True),
             stop_on_error=data.get("stop_on_error", False),
+            auto_resolve_conflicts=data.get("auto_resolve_conflicts", False),
             tokens=tokens,
         )
         if config.tokens:
