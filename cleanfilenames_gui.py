@@ -245,7 +245,7 @@ class MainWindow(QMainWindow):
         if directory:
             self.path_edit.setText(directory)
 
-    def on_scan(self) -> None:
+    def on_scan_clicked(self) -> None:
         path_text = self.path_edit.text().strip()
         if not path_text:
             QMessageBox.warning(self, "Missing folder", "Please select a folder first.")
@@ -317,8 +317,6 @@ class MainWindow(QMainWindow):
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            # Always re-collect candidates to get a fresh state from disk
-            # and ensure current settings are applied.
             self.candidates = collect_candidates(
                 self.current_path, config=self.config, token_tracker=self.token_tracker
             )

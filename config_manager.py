@@ -53,21 +53,15 @@ class AppConfig:
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "AppConfig":
-        print(f"Loading config from: {path}")
         is_default_path = path is None
         path = path or CONFIG_PATH
 
         if not path.exists():
-            print(f"Path does not exist: {path}")
             if is_default_path:
-                # If using the default path, create it on first run
-                print("Using default path, creating config.")
                 config = cls()
                 config.save(path)
                 return config
             else:
-                # If a specific path was provided and it doesn't exist, raise an error
-                print("Raising FileNotFoundError")
                 raise FileNotFoundError(f"Config file not found at specified path: {path}")
 
         try:

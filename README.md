@@ -146,6 +146,9 @@ python3 cleanfilenames_core.py /tmp/clean_test_suite --apply  # Apply
 - [x] **Conflict Panel**: Investigate moving the conflict resolver into a dedicated panel so multi-item conflicts can be resolved without giant modal dialogs.
 - [x] **Result Sorting & Filtering**: Allow sorting the scan results by type/status/message and filter the table down to only passed/failed entries for easier triage.
 - [] **Detect conflicts during scan, not when applying changes:** Find conflicting files before applying changes and having them fail.
+- [] **Async Scan / Apply Workers:** Move long-running scans and rename jobs off the Qt UI thread (QThread/QtConcurrent) so the GUI stays responsive on 10k+ file runs.
+- [] **CLI Structured Output Mode:** Add `--json`/`--csv` options so automations can consume rename previews without scraping stdout.
+- [] **Per-Scan Config Overrides:** Support saving/loading alternate configs from the GUI (or allow pointing the CLI at arbitrary config files without editing the global `~/.config/cleanfilenames/config.json`).
 
 ## Current Status (2025‑11‑13)
 
