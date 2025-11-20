@@ -48,6 +48,43 @@ pyinstaller cleanfilenames.spec
 
 Result: `dist/CleanFilenames` (Linux binary)
 
+## Cross-Compile Windows .exe on Linux (Docker + Wine)
+
+Since PyInstaller cannot cross-compile natively, you can use Docker with Wine to build Windows executables from Linux:
+
+1. **Pull the Docker image:**
+   ```bash
+   docker pull batonogov/pyinstaller-windows
+   ```
+
+2. **Build the Windows executable:**
+   ```bash
+   docker run --rm -v "$(pwd):/src" batonogov/pyinstaller-windows \
+     "pip install -r requirements.txt && pyinstaller --clean cleanfilenames.spec"
+   ```
+
+3. **Fix file ownership (files are created as root):**
+   ```bash
+   sudo chown -R $USER:$USER dist/
+   ```
+
+4. **Find the executable:**
+   - Location: `dist/CleanFilenames.exe`
+   - Size: ~25MB (with UPX compression)
+   - Type: PE32+ executable for Windows (64-bit GUI)
+
+**How it works:**
+- The Docker container runs Linux with Wine installed
+- Wine provides Windows API compatibility on Linux
+- PyInstaller (Windows version) runs through Wine to create genuine Windows executables
+- No actual Windows installation required - purely command-line toolchain
+- The resulting `.exe` is a real Windows executable that runs on Windows computers
+
+**Note:** You cannot run or test the GUI through this container - it's build-only. To test the `.exe`, you need:
+- An actual Windows computer
+- A Windows VM (VirtualBox, QEMU, etc.)
+- Wine on your Linux desktop: `wine dist/CleanFilenames.exe`
+
 ## Notes
 
 - PyInstaller builds for the platform you're running on
