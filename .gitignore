@@ -1,12 +1,69 @@
-.venv/
+# Python
 __pycache__/
-.pytest_cache/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
 dist/
 build/
-*.spec
-*.pyc
+wheels/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# PyInstaller
+*.spec.bak
+*.manifest
+
+# Testing
+.pytest_cache/
+.tox/
 .coverage
 coverage.xml
 htmlcov/
-.tox/
-*.egg-info/
+.hypothesis/
+*.cover
+.cache
+nosetests.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+pip-log.txt
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# User configs (created at runtime)
+config.json
+
+# Temporary test data
+/tmp/
+*.tmp
