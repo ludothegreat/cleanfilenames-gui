@@ -5,3 +5,8 @@ dist/
 build/
 *.spec
 *.pyc
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+*.egg-info/
