@@ -5,12 +5,13 @@ Python reimplementation of the `cleanfilenames.ps1` utility with both CLI and GU
 ## Layout
 
 ```
-cleanfilenames_py/
+cleanfilenames-gui/
 ├── cleanfilenames_core.py              # Core rename logic + CLI
 ├── cleanfilenames_gui.py               # PySide6 GUI
-├── config_manager.py                   # Configuration management
+├── config_manager.py                   # Configuration management + presets
+├── token_manager.py                    # Token validation + suggestions
 ├── generate_cleanfilenames_testdata.py # Test data generator
-├── __init__.py
+├── presets/                            # Default + minimal token lists
 └── README.md
 ```
 
@@ -22,11 +23,11 @@ cleanfilenames_py/
 Install dependencies (recommend a venv):
 
 ```bash
-cd /hoard/scripts/cleanfilenames_py
+cd /hoard/workspace/cleanfilenames-gui
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install PySide6
+pip install -r requirements.txt
 ```
 
 ## Configuration
@@ -57,13 +58,11 @@ Settings are stored in `~/.config/cleanfilenames/config.json` (auto-created the 
 ### Working with Tokens & Patterns
 
 - **Tokens** represent the literal text that appears in parentheses in your filenames (e.g., `USA`, `Europe`, `En,Fr,De,Es,It`). Each token can include commas or other characters; the tool treats it as raw text unless you add regex syntax yourself.
-- The **pattern** is the full regular expression derived from the token list. It adds the wrapping `\s*\((?: ... )\)\s*` around the tokens, which matches any of the listed tokens with surrounding parentheses/spaces.
-- To create your own pattern, either:
-  1. Edit the token list (one token per line) and let the tool rebuild the regex automatically, or
-  2. Paste a fully custom regex into the pattern box (advanced users). When the regex no longer matches a preset, the UI switches to “Custom.”
-- Use the **Load Pattern** button to import a saved regex text file, and **Save Pattern** to export the current regex for reuse or version control.
+- The **pattern** is automatically rebuilt from the token list. The tool adds the wrapping `\s*\((?: ... )\)\s*`, which matches any of the listed tokens with surrounding parentheses/spaces.
+- Use the **Token Manager** dialog to edit tokens (one per line), import/export token lists, or load the default/minimal presets.
+- Custom regex tweaks are still possible by editing `~/.config/cleanfilenames/config.json`, but the GUI always regenerates the regex from the current tokens to keep everything in sync.
 
-The GUI exposes these settings via the **Settings** dialog; the CLI can load alternate configs with `--config path/to/config.json`.
+The CLI can load alternate configs with `--config path/to/config.json`.
 
 ## CLI Usage
 
@@ -88,18 +87,15 @@ python3 cleanfilenames_gui.py
 ```
 
 Features:
-- Browse for a folder, scan, and apply changes.
-- Dry run mode to simulate renames (status column shows "done (dry run)").
-- Settings dialog with:
-  - Preset selector (full list vs. minimal list vs. custom).
-  - Token editor (one region token per line, rebuilt into the regex; supports commas and regex syntax if you need ranges).
-  - Load/save buttons for importing/exporting regex patterns.
-  - Toggles for directory/root renames and stop-on-error behavior.
-- Token Manager dialog that tracks duplicate tokens, shows usage counts from the latest scan, and lets you append auto-detected suggestions with a couple of clicks.
-- Built-in help dialog explaining tokens, patterns, and customization paths.
+- Browse for a folder, scan, and apply changes from a single window.
+- Dry run checkbox to simulate renames (status column shows "done (dry run)").
+- Auto-resolve checkbox that mirrors the CLI’s `auto_resolve_conflicts` flag.
+- Token Manager dialog with preset loader, import/export, duplicate finder, and regex help.
+- Token suggestions table that surfaces new tags discovered during scans (append them with one click).
+- Built-in manual conflict resolver so you can edit colliding targets directly in the UI.
 - Table results support `Ctrl+C`/`Cmd+C` to copy selected rows as tab-separated text.
 - Right-click the results to export CSV; the table includes a "Directory" column so you can see the path relative to the scan root (e.g., `Extras/Music/Track 01`). This mirrors the on-disk rename order.
-- For large scans, the table shows the first 5,000 rows; use the CSV export to review the full list.
+- For large scans, pagination keeps the UI responsive; export to CSV for full results.
 
 ## Testing
 
@@ -140,15 +136,16 @@ python3 cleanfilenames_core.py /tmp/clean_test_suite --apply  # Apply
 
 - The regex is identical to the PowerShell version for parity.
 - Directories are renamed deepest-first to avoid "path not found" issues.
-- Collisions are reported but not auto-resolved (per current PowerShell behavior).
+- Collisions are reported in the results table; if the auto-resolve toggle is enabled, the tool will append ` (1)`, ` (2)`, etc. to keep going, just like the CLI’s conflict resolution path.
 
 ## TODO
 
 - [x] **Auto Token Discovery**: When scanning files, detect potential region tokens that aren't in the current config and offer to add them automatically. This would help users discover new patterns without manually editing the token list.
 
-- [ ] **Manual Conflict Resolution**: After scanning, if there are filename collisions or conflicts, allow manual renaming directly in the GUI. This would eliminate the need to use a file manager or CLI to resolve conflicts - everything can be managed in one place.
-- [ ] **Conflict Panel**: Investigate moving the conflict resolver into a dedicated panel so multi-item conflicts can be resolved without giant modal dialogs.
-- [ ] **Result Sorting & Filtering**: Allow sorting the scan results by type/status/message and filter the table down to only passed/failed entries for easier triage.
+- [x] **Manual Conflict Resolution**: After scanning, if there are filename collisions or conflicts, allow manual renaming directly in the GUI. This would eliminate the need to use a file manager or CLI to resolve conflicts - everything can be managed in one place.
+- [x] **Conflict Panel**: Investigate moving the conflict resolver into a dedicated panel so multi-item conflicts can be resolved without giant modal dialogs.
+- [x] **Result Sorting & Filtering**: Allow sorting the scan results by type/status/message and filter the table down to only passed/failed entries for easier triage.
+- [] **Detect conflicts during scan, not when applying changes:** Find conflicting files before applying changes and having them fail.
 
 ## Current Status (2025‑11‑13)
 

@@ -349,7 +349,6 @@ if __name__ == "__main__":
         help="Explicitly skip renames even if --apply is provided.",
     )
     args = parser.parse_args()
-    print(f"args.config = {args.config}")
 
     try:
         config = (

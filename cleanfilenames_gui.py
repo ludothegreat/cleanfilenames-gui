@@ -51,7 +51,7 @@ from token_manager import (
     normalize_token,
     validate_tokens,
 )
-from cleanfilenames_core import apply_candidates, collect_candidates, summarize
+from cleanfilenames_core import apply_candidates, collect_candidates, summarize, RenameCandidate
 
 
 def _normalize_path_for_gui(path: Path) -> str:
@@ -83,8 +83,8 @@ En,Ja,Fr,De,Es,It,Pt,Ko,Ru,Ar</pre>
 <ul>
   <li>Choosing a preset to load a known token list.</li>
   <li>Editing tokens (one per line). The regex updates automatically.</li>
-  <li>Pasting a custom regex (advanced users) to switch to “Custom” mode.</li>
-  <li>Loading or saving regex text files for reuse.</li>
+  <li>Importing/exporting token lists to share configurations.</li>
+  <li>Saving token edits to <code>config.json</code>; the CLI and GUI will both use them.</li>
 </ul>
 <p>Tokens may include regex syntax if you intentionally want pattern matching (e.g., <code>v\\d+\\.\\d+</code>),
 but remember that the entire token is inserted into the regex as-is.</p>
@@ -646,7 +646,7 @@ class MainWindow(QMainWindow):
         copy_action = menu.addAction("Copy Selected (Tab-separated)")
         export_action = menu.addAction("Export to CSV…")
         edit_action = menu.addAction("Edit Target Name…")
-        resolve_action = menu.addAction("Resolve Conflict…")
+        resolve_action = menu.addAction("Resolve Multiple Conflicts…")
         action = menu.exec(self.table.viewport().mapToGlobal(pos))
         if action == copy_action:
             self.copy_selected_rows()
@@ -706,40 +706,78 @@ class MainWindow(QMainWindow):
             "New name:",
             text=cand.new_name,
         )
-        if not ok:
+        if not ok or not new_name.strip():
             return
-        self.apply_new_name(cand, new_name)
-        self.update_table()
 
-    def apply_new_name(self, cand: RenameCandidate, name: str) -> bool:
-        new_name = name.strip()
-        if not new_name:
-            QMessageBox.warning(self, "Invalid name", "Name cannot be empty.")
-            return False
+        new_name = new_name.strip()
+
+        # Validate the new name
         if any(sep in new_name for sep in ("/", "\\")):
             QMessageBox.warning(
                 self,
                 "Invalid name",
                 "Name cannot contain path separators (/ or \\).",
             )
+            return
+
+        # Confirm the rename operation
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Rename",
+            f"This will immediately rename:\n\n"
+            f"From: {cand.path.name}\n"
+            f"To: {new_name}\n\n"
+            f"Continue?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+
+        # Actually rename the file/directory on disk
+        if not self.apply_rename_on_disk(cand, new_name):
+            return
+
+        # Rescan to update the view
+        QMessageBox.information(
+            self,
+            "Rename Complete",
+            f"File renamed successfully. Rescanning to update the view...",
+        )
+        self.on_scan()
+
+    def apply_rename_on_disk(self, cand: "RenameCandidate", new_name: str) -> bool:
+        """Actually rename a file or directory on disk."""
+        try:
+            source = cand.path
+            if not source.exists():
+                QMessageBox.warning(
+                    self,
+                    "File Not Found",
+                    f"Source file not found: {source}",
+                )
+                return False
+
+            parent = source.parent
+            target = parent / new_name
+
+            if target.exists():
+                QMessageBox.warning(
+                    self,
+                    "Target Exists",
+                    f"A file or directory with the name '{new_name}' already exists.",
+                )
+                return False
+
+            source.rename(target)
+            return True
+
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "Rename Failed",
+                f"Failed to rename file:\n\n{exc}",
+            )
             return False
-        if cand.item_type == "file":
-            parent = cand.new_path.parent if cand.new_path else cand.path.parent
-            cand.new_name = new_name
-            cand.new_path = parent / new_name
-        else:
-            parent = cand.new_path.parent if cand.new_path else cand.path.parent
-            cand.new_name = new_name
-            cand.new_path = parent / new_name
-        if self.current_path:
-            try:
-                rel = cand.new_path.relative_to(self.current_path)
-                cand.relative_path = str(rel) if rel != Path(".") else "."
-            except ValueError:
-                cand.relative_path = str(cand.new_path)
-        cand.status = "error (edited)"
-        cand.message = ""
-        return True
 
 
 
@@ -1020,7 +1058,7 @@ class ConflictResolutionDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Resolve Conflict")
+        self.setWindowTitle("Resolve Multiple Conflicts")
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Conflicting items:"))
         scroll = QScrollArea()
@@ -1058,7 +1096,7 @@ def resolve_conflict(self: MainWindow) -> None:
     if not rows:
         QMessageBox.information(
             self,
-            "Resolve Conflict",
+            "Resolve Multiple Conflicts",
             "Select a conflicting row first.",
         )
         return
@@ -1069,7 +1107,7 @@ def resolve_conflict(self: MainWindow) -> None:
     if not cand.message.startswith("Multiple items"):
         QMessageBox.information(
             self,
-            "Resolve Conflict",
+            "Resolve Multiple Conflicts",
             "This row is not part of a multi-item conflict.",
         )
         return
@@ -1082,15 +1120,62 @@ def resolve_conflict(self: MainWindow) -> None:
     if len(collisions) < 2:
         QMessageBox.information(
             self,
-            "Resolve Conflict",
+            "Resolve Multiple Conflicts",
             "Could not locate multiple conflicting items for this entry.",
         )
         return
     dialog = ConflictResolutionDialog(collisions, self)
     if dialog.exec() == QDialog.Accepted:
+        # Confirm the rename operation
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Rename",
+            f"This will immediately rename {len(collisions)} conflicting items.\n\n"
+            f"Continue?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+
+        # Validate and rename each file
+        success_count = 0
+        failed = []
+
         for candidate, new_name in dialog.names():
-            self.apply_new_name(candidate, new_name)
-        self.update_table()
+            new_name = new_name.strip()
+
+            # Validate the new name
+            if not new_name:
+                failed.append(f"{candidate.path.name}: Name cannot be empty")
+                continue
+
+            if any(sep in new_name for sep in ("/", "\\")):
+                failed.append(f"{candidate.path.name}: Name cannot contain path separators")
+                continue
+
+            # Actually rename the file
+            if self.apply_rename_on_disk(candidate, new_name):
+                success_count += 1
+            else:
+                failed.append(f"{candidate.path.name}: Rename failed")
+
+        # Show results
+        if failed:
+            QMessageBox.warning(
+                self,
+                "Conflicts Partially Resolved",
+                f"Successfully renamed {success_count} items.\n\n"
+                f"Failed:\n" + "\n".join(failed),
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Conflicts Resolved",
+                f"Successfully renamed all {success_count} items. Rescanning...",
+            )
+
+        # Rescan to update the view
+        self.on_scan()
 
 
 MainWindow.resolve_conflict = resolve_conflict
