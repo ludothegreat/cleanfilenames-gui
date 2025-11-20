@@ -10,18 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional, Set
 
-# Support both package and script imports
-try:  # pragma: no cover
-    from .config_manager import (  # type: ignore
-        AppConfig,
-        ConfigLoadError,
-        DEFAULT_PATTERN,
-        build_regex,
-    )
-    from .token_manager import TokenTracker
-except ImportError:  # pragma: no cover
-    from config_manager import AppConfig, ConfigLoadError, DEFAULT_PATTERN, build_regex
-    from token_manager import TokenTracker
+from config_manager import AppConfig, ConfigLoadError, DEFAULT_PATTERN, build_regex
+from token_manager import TokenTracker
 
 REGION_PATTERN = re.compile(DEFAULT_PATTERN)
 

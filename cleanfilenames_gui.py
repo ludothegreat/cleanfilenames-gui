@@ -35,40 +35,23 @@ from PySide6.QtWidgets import (
     QScrollArea,
 )
 
-try:  # pragma: no cover
-    from .config_manager import (  # type: ignore
-        AppConfig,
-        ConfigLoadError,
-        DEFAULT_PATTERN,
-        DEFAULT_TOKENS,
-        PRESETS_DIR,
-        build_regex,
-        load_preset_tokens,
-    )
-    from .token_manager import (
-        TokenSuggestion,
-        TokenTracker,
-        find_duplicate_tokens,
-        normalize_token,
-        validate_tokens,
-    )
-except ImportError:  # pragma: no cover
-    from config_manager import (
-        AppConfig,
-        ConfigLoadError,
-        DEFAULT_PATTERN,
-        DEFAULT_TOKENS,
-        PRESETS_DIR,
-        build_regex,
-        load_preset_tokens,
-    )
-    from token_manager import (
-        TokenSuggestion,
-        TokenTracker,
-        find_duplicate_tokens,
-        normalize_token,
-        validate_tokens,
-    )
+from config_manager import (
+    AppConfig,
+    ConfigLoadError,
+    DEFAULT_PATTERN,
+    DEFAULT_TOKENS,
+    PRESETS_DIR,
+    build_regex,
+    load_preset_tokens,
+)
+from token_manager import (
+    TokenSuggestion,
+    TokenTracker,
+    find_duplicate_tokens,
+    normalize_token,
+    validate_tokens,
+)
+from cleanfilenames_core import apply_candidates, collect_candidates, summarize
 
 
 def _normalize_path_for_gui(path: Path) -> str:
@@ -108,12 +91,6 @@ but remember that the entire token is inserted into the regex as-is.</p>
 <p>A helpful regex cheat sheet can be found here:
 <a href="https://www.rexegg.com/regex-quickstart.php">https://www.rexegg.com/regex-quickstart.php</a></p>
 """
-
-if __package__:
-    from .cleanfilenames_core import apply_candidates, collect_candidates, summarize
-else:  # Allow running as a stand-alone script
-    sys.path.append(str(Path(__file__).resolve().parent))
-    from cleanfilenames_core import apply_candidates, collect_candidates, summarize
 
 
 class MainWindow(QMainWindow):
