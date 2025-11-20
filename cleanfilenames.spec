@@ -3,7 +3,12 @@
 block_cipher = None
 
 a = Analysis(
-    ['cleanfilenames_gui.py'],
+    [
+        'cleanfilenames_gui.py',
+        'cleanfilenames_core.py',
+        'config_manager.py',
+        'token_manager.py',
+    ],
     pathex=[],
     binaries=[],
     datas=[
@@ -13,9 +18,6 @@ a = Analysis(
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
-        'cleanfilenames_core',
-        'config_manager',
-        'token_manager',
     ],
     hookspath=[],
     hooksconfig={},
