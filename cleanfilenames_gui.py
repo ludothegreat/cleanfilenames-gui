@@ -245,7 +245,7 @@ class MainWindow(QMainWindow):
         if directory:
             self.path_edit.setText(directory)
 
-    def on_scan_clicked(self) -> None:
+    def on_scan(self) -> None:
         path_text = self.path_edit.text().strip()
         if not path_text:
             QMessageBox.warning(self, "Missing folder", "Please select a folder first.")
@@ -644,7 +644,7 @@ class MainWindow(QMainWindow):
         copy_action = menu.addAction("Copy Selected (Tab-separated)")
         export_action = menu.addAction("Export to CSV…")
         edit_action = menu.addAction("Edit Target Name…")
-        resolve_action = menu.addAction("Resolve Multiple Conflicts…")
+        resolve_action = menu.addAction("Resolve Multi-Conflicts…")
         action = menu.exec(self.table.viewport().mapToGlobal(pos))
         if action == copy_action:
             self.copy_selected_rows()
@@ -735,13 +735,13 @@ class MainWindow(QMainWindow):
         if not self.apply_rename_on_disk(cand, new_name):
             return
 
-        # Rescan to update the view
+        # Notify success but don't rescan - let them edit multiple files
         QMessageBox.information(
             self,
             "Rename Complete",
-            f"File renamed successfully. Rescanning to update the view...",
+            f"File renamed successfully.\n\n"
+            f"Note: You'll need to rescan before applying additional changes.",
         )
-        self.on_scan()
 
     def apply_rename_on_disk(self, cand: "RenameCandidate", new_name: str) -> bool:
         """Actually rename a file or directory on disk."""
@@ -1056,7 +1056,7 @@ class ConflictResolutionDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Resolve Multiple Conflicts")
+        self.setWindowTitle("Resolve Multi-Conflicts")
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Conflicting items:"))
         scroll = QScrollArea()
@@ -1094,7 +1094,7 @@ def resolve_conflict(self: MainWindow) -> None:
     if not rows:
         QMessageBox.information(
             self,
-            "Resolve Multiple Conflicts",
+            "Resolve Multi-Conflicts",
             "Select a conflicting row first.",
         )
         return
@@ -1105,7 +1105,7 @@ def resolve_conflict(self: MainWindow) -> None:
     if not cand.message.startswith("Multiple items"):
         QMessageBox.information(
             self,
-            "Resolve Multiple Conflicts",
+            "Resolve Multi-Conflicts",
             "This row is not part of a multi-item conflict.",
         )
         return
@@ -1118,7 +1118,7 @@ def resolve_conflict(self: MainWindow) -> None:
     if len(collisions) < 2:
         QMessageBox.information(
             self,
-            "Resolve Multiple Conflicts",
+            "Resolve Multi-Conflicts",
             "Could not locate multiple conflicting items for this entry.",
         )
         return
@@ -1163,17 +1163,16 @@ def resolve_conflict(self: MainWindow) -> None:
                 self,
                 "Conflicts Partially Resolved",
                 f"Successfully renamed {success_count} items.\n\n"
-                f"Failed:\n" + "\n".join(failed),
+                f"Failed:\n" + "\n".join(failed) +
+                f"\n\nNote: You'll need to rescan before applying additional changes.",
             )
         else:
             QMessageBox.information(
                 self,
                 "Conflicts Resolved",
-                f"Successfully renamed all {success_count} items. Rescanning...",
+                f"Successfully renamed all {success_count} items.\n\n"
+                f"Note: You'll need to rescan before applying additional changes.",
             )
-
-        # Rescan to update the view
-        self.on_scan()
 
 
 MainWindow.resolve_conflict = resolve_conflict
