@@ -21,6 +21,7 @@ env/
 *.py.bak
 *.spec.bak
 *.manifest
+test_checklist.md
 
 # Testing
 .pytest_cache/
