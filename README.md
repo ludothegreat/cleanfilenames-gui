@@ -1,6 +1,8 @@
 # Clean Filenames (Python Edition)
 
-Python reimplementation of the `cleanfilenames.ps1` utility with both CLI and GUI front-ends. It removes region tags like `(USA)`, `(JP)`, `(En,Fr,De,Es)` from file/folder names and tidies whitespace.
+Python reimplementation of my `cleanfilenames.ps1` utility with both CLI and GUI front-ends. It removes region tags like `(USA)`, `(JP)`, `(En,Fr,De,Es)` from file/folder names and tidies whitespace.
+
+![gui screenshot](screenshot-2025-11-20_10-48-20.png)
 
 ## Layout
 
@@ -32,7 +34,7 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Settings are stored in `~/.config/cleanfilenames/config.json` (auto-created the first time you run the tool). Example:
+Settings are stored in `~/.config/cleanfilenames/config.json` on Linux or `%USERPROFILE%\.config\cleanfilenames\config.json` on Windows (auto-created the first time you run the tool). Example:
 
 ```json
 {
@@ -92,7 +94,7 @@ Features:
 - Auto-resolve checkbox that mirrors the CLI’s `auto_resolve_conflicts` flag.
 - Token Manager dialog with preset loader, import/export, duplicate finder, and regex help.
 - Token suggestions table that surfaces new tags discovered during scans (append them with one click).
-- Built-in manual conflict resolver so you can edit colliding targets directly in the UI.
+- Built-in manual conflict resolver so you can (right click) edit colliding targets directly in the UI.
 - Table results support `Ctrl+C`/`Cmd+C` to copy selected rows as tab-separated text.
 - Right-click the results to export CSV; the table includes a "Directory" column so you can see the path relative to the scan root (e.g., `Extras/Music/Track 01`). This mirrors the on-disk rename order.
 - For large scans, pagination keeps the UI responsive; export to CSV for full results.
@@ -113,17 +115,17 @@ python3 generate_cleanfilenames_testdata.py --large
 ```
 
 The generator creates:
-- Realistic ROM filenames with various region tags
+- Realisticish ROM filenames with various region tags
 - Nested directory structures (Console/Category)
 - Directory names with region tags
 - Exact collision scenarios (files that would conflict after cleaning)
 - Case-insensitive collision scenarios (for Windows testing)
-- Test data location: `/tmp/clean_test_suite`
+- Test data location: `/tmp/clean_test_suite` on Linux and the root application directory on Windows
 
 After generating, test with:
 ```bash
-python3 cleanfilenames_core.py /tmp/clean_test_suite          # Preview
-python3 cleanfilenames_core.py /tmp/clean_test_suite --apply  # Apply
+python3 cleanfilenames_core.py /tmp/clean_test_suite
+python3 cleanfilenames_core.py /tmp/clean_test_suite --apply
 ```
 
 ## Building a Windows `.exe`
@@ -134,7 +136,6 @@ python3 cleanfilenames_core.py /tmp/clean_test_suite --apply  # Apply
 
 ## Notes
 
-- The regex is identical to the PowerShell version for parity.
 - Directories are renamed deepest-first to avoid "path not found" issues.
 - Collisions are reported in the results table; if the auto-resolve toggle is enabled, the tool will append ` (1)`, ` (2)`, etc. to keep going, just like the CLI’s conflict resolution path.
 
@@ -145,19 +146,11 @@ python3 cleanfilenames_core.py /tmp/clean_test_suite --apply  # Apply
 - [x] **Manual Conflict Resolution**: After scanning, if there are filename collisions or conflicts, allow manual renaming directly in the GUI. This would eliminate the need to use a file manager or CLI to resolve conflicts - everything can be managed in one place.
 - [x] **Conflict Panel**: Investigate moving the conflict resolver into a dedicated panel so multi-item conflicts can be resolved without giant modal dialogs.
 - [x] **Result Sorting & Filtering**: Allow sorting the scan results by type/status/message and filter the table down to only passed/failed entries for easier triage.
-- [] **Detect conflicts during scan, not when applying changes:** Find conflicting files before applying changes and having them fail. When implemented, also add a WARNING in big red letters when the "Auto-resolve conflicts" checkbox is selected, requiring users to acknowledge they understand it will auto-rewrite their filenames.
-- [] **Import/Export Local Config & Token List:** Add GUI buttons to import/export the user's local configuration file and token list (stored at `~/.config/cleanfilenames/config.json` on Linux or `%USERPROFILE%\.config\cleanfilenames\config.json` on Windows). This would allow users to easily back up, share, or transfer their custom token configurations between machines.
-- [] **Size Selection for GenerateTestFiles.exe:** Add interactive size selection prompt that pauses the script and asks the user what size test bed to create (small/medium/large) instead of requiring command-line arguments. This would make the tool more user-friendly for non-technical users.
-- [] **Sortable Column Headers:** Allow clicking on table column headers to sort results by that column (type, old name, new name, status, message, directory).
-- [] **Progress Bar for Apply Changes:** Add a progress bar during the apply operation to show real-time progress. This requires refactoring to emit progress signals during the rename loop.
-- [] **Async Scan / Apply Workers:** Move long-running scans and rename jobs off the Qt UI thread (QThread/QtConcurrent) so the GUI stays responsive on 10k+ file runs.
-- [] **CLI Structured Output Mode:** Add `--json`/`--csv` options so automations can consume rename previews without scraping stdout.
-- [] **Per-Scan Config Overrides:** Support saving/loading alternate configs from the GUI (or allow pointing the CLI at arbitrary config files without editing the global `~/.config/cleanfilenames/config.json`).
-
-## Current Status (2025‑11‑13)
-
-- Platform parity work is complete: the PowerShell snapshot logic now lives in `cleanfilenames_core.py` with both CLI and PySide6 GUI entrypoints, tokenized regex presets, JSON config auto-loading, context menu + CSV export, regex help dialog, and 5K-row UI truncation for large jobs.
-- Normalization now drops literal `\` characters and rebuilds the region regex from the saved token list, so dry runs and real runs stay in sync even after editing presets.
-- Latest fix (this session) adjusts file renames to reference the post-directory-rename parent path, eliminating the `[Errno 2] No such file or directory` bursts that showed up when applying against `/tmp/clean_test_suite`.
-- Smoke test: `python3 cleanfilenames_core.py /tmp/clean_test_suite_sample --apply` succeeded with 6/6 renames; the real 50-folder dataset still needs to be regenerated (previous run already normalized everything under `/tmp/clean_test_suite`, so there is nothing left to rename right now).
-- Outstanding follow-ups for tomorrow: (1) recreate `/tmp/clean_test_suite` (and the larger 4k-folder stress data, if needed), (2) re-run a GUI dry-run + apply to confirm the fix at scale, (3) delete temporary exports (`cleanfilenames.csv`, `cleanfilenames.txt`) if they are no longer needed once verification is done.
+- [ ] **Detect conflicts during scan, not when applying changes:** Find conflicting files before applying changes and having them fail. When implemented, also add a WARNING in big red letters when the "Auto-resolve conflicts" checkbox is selected, requiring users to acknowledge they understand it will auto-rewrite their filenames.
+- [ ] **Import/Export Local Config & Token List:** Add GUI buttons to import/export the user's local configuration file and token list (stored at `~/.config/cleanfilenames/config.json` on Linux or `%USERPROFILE%\.config\cleanfilenames\config.json` on Windows). This would allow users to easily back up, share, or transfer their custom token configurations between machines.
+- [ ] **Size Selection for GenerateTestFiles.exe:** Add interactive size selection prompt that pauses the script and asks the user what size test bed to create (small/medium/large) instead of requiring command-line arguments. This would make the tool more user-friendly for non-technical users.
+- [ ] **Sortable Column Headers:** Allow clicking on table column headers to sort results by that column (type, old name, new name, status, message, directory).
+- [ ] **Progress Bar for Apply Changes:** Add a progress bar during the apply operation to show real-time progress. This requires refactoring to emit progress signals during the rename loop.
+- [ ] **Async Scan / Apply Workers:** Move long-running scans and rename jobs off the Qt UI thread (QThread/QtConcurrent) so the GUI stays responsive on 10k+ file runs.
+- [ ] **CLI Structured Output Mode:** Add `--json`/`--csv` options so automations can consume rename previews without scraping stdout.
+- [ ] **Per-Scan Config Overrides:** Support saving/loading alternate configs from the GUI (or allow pointing the CLI at arbitrary config files without editing the global `~/.config/cleanfilenames/config.json`).
