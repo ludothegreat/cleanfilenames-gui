@@ -73,5 +73,5 @@ Result: `dist/CleanFilenames` (Linux binary)
 
 - PyInstaller builds for the platform you're running on
 - The executable is self-contained and includes Python + all dependencies
-- File size is ~90MB due to PySide6/Qt libraries
-- No installation required - users just run the .exe
+- No installation required - users just run the self extracting .exe
+
