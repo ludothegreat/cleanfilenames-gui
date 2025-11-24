@@ -2,6 +2,8 @@
 
 Python reimplementation of my `cleanfilenames.ps1` utility with both CLI and GUI front-ends. It removes region tags like `(USA)`, `(JP)`, `(En,Fr,De,Es)` from file/folder names and tidies whitespace.
 
+![gui screenshot](screenshot-2025-11-20_10-48-20.png)
+
 ## Layout
 
 ```
