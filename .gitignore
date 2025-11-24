@@ -18,6 +18,7 @@ ENV/
 env/
 
 # PyInstaller
+*.py.bak
 *.spec.bak
 *.manifest
 
