@@ -30,20 +30,26 @@ jobs:
       run: |
         pyinstaller cleanfilenames.spec
 
-    - name: Upload Windows artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: CleanFilenames-Windows
-        path: dist/CleanFilenames/CleanFilenames.exe
-        if-no-files-found: error
+    - name: Package Windows build
+      run: |
+        Compress-Archive -Path dist/CleanFilenames -DestinationPath dist/CleanFilenames-Windows.zip
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/CleanFilenames/CleanFilenames.exe
+        files: dist/CleanFilenames-Windows.zip
         draft: false
         prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CleanFilenames-Windows
+        path: dist/CleanFilenames-Windows.zip
+        if-no-files-found: error
 
   build-linux:
     runs-on: ubuntu-latest
@@ -65,17 +71,24 @@ jobs:
       run: |
         pyinstaller cleanfilenames.spec
 
-    - name: Upload Linux artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: CleanFilenames-Linux
-        path: dist/CleanFilenames/CleanFilenames
-        if-no-files-found: error
+    - name: Package Linux build
+      run: |
+        cd dist
+        zip -r CleanFilenames-Linux.zip CleanFilenames
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/CleanFilenames/CleanFilenames
+        files: dist/CleanFilenames-Linux.zip
         draft: false
         prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Linux artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CleanFilenames-Linux
+        path: dist/CleanFilenames-Linux.zip
+        if-no-files-found: error
