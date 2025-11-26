@@ -128,6 +128,12 @@ python3 cleanfilenames_core.py /tmp/clean_test_suite
 python3 cleanfilenames_core.py /tmp/clean_test_suite --apply
 ```
 
+## Releases
+
+- Tag a version: `git tag v1.2.3 && git push --tags` (ensure your GitForge→GitHub mirror also mirrors tags).
+- GitHub Actions builds Windows and Linux executables from the tag (`.github/workflows/build-release.yml`) and attaches them to the GitHub release automatically.
+- Use `workflow_dispatch` in the same workflow if you ever need to rerun a release build manually.
+
 ## Building a Windows `.exe`
 
 1. Install PyInstaller in your (virtual) environment: `pip install pyinstaller`.
