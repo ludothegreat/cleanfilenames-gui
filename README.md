@@ -12,6 +12,7 @@ cleanfilenames-gui/
 ├── cleanfilenames_gui.py               # PySide6 GUI
 ├── config_manager.py                   # Configuration management + presets
 ├── token_manager.py                    # Token validation + suggestions
+├── cleanfilenames.ps1                  # Original PowerShell script (legacy)
 ├── generate_cleanfilenames_testdata.py # Test data generator
 ├── presets/                            # Default + minimal token lists
 └── README.md
